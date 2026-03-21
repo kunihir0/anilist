@@ -2,9 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    branches:
+      - main
+      - dev
   pull_request:
-    branches: [main]
+    branches:
+      - main
+  # Allows manual triggering from the Actions tab to verify the workflow works
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -51,10 +56,9 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Run Clippy
-        # -D warnings treats all warnings as errors
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-  # ── Type check (fast, no codegen) ───────────────────────────────────────────
+  # ── Type check ──────────────────────────────────────────────────────────────
   check:
     name: Cargo Check
     runs-on: ubuntu-latest
@@ -103,5 +107,3 @@ jobs:
 
       - name: Run tests
         run: cargo test --all-targets
-        # No DISCORD_TOKEN needed — bot tests should mock or unit-test
-        # pure logic only (embed builders, cache, rate limiter, etc.)
