@@ -1,4 +1,4 @@
-use poise::{ChoiceParameter, CreateReply};
+use poise::CreateReply;
 use crate::{
     api::anilist::fetch_filtered_media,
     models::bot_data::{Context, Error, MediaType, MediaFormat, MediaStatus, MediaSort},

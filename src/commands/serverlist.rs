@@ -33,7 +33,7 @@ pub async fn add(
                 added_by: ctx.author().id.get(),
                 watched: false,
             };
-            data.store.add_to_server_list(ctx.guild_id().unwrap().get(), entry).await?;
+            data.store.add_to_server_list(ctx.guild_id().ok_or("This command must be run in a server")?.get(), entry).await?;
             ctx.say(format!("Added **{}** to the server list.", media.title.preferred())).await?;
         }
         Err(e) => {
@@ -46,7 +46,7 @@ pub async fn add(
 /// List all titles in the shared server list.
 #[poise::command(slash_command, prefix_command, guild_only)]
 pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().unwrap().get();
+    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?.get();
     let settings = ctx.data().store.get_settings(guild_id).await;
     
     ctx.send(poise::CreateReply::default().embed(server_list_embed(&settings.server_list, settings.accent_color))).await?;
@@ -59,7 +59,7 @@ pub async fn watched(
     ctx: Context<'_>,
     #[description = "ID of the entry to mark watched"] id: String,
 ) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().unwrap().get();
+    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?.get();
     
     // Check for mod permissions
     let member = ctx.author_member().await.ok_or("Not in a guild")?;

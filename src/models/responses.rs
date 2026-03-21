@@ -3,7 +3,7 @@ use crate::store::TitleLanguage;
 
 // ─── GraphQL envelope ────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphQlResponse<T> {
     pub data: T,
 }
@@ -160,20 +160,20 @@ impl NextAiringEpisode {
 
 // ─── Paginated media response ─────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaSearchData {
     #[serde(rename = "Page")]
     pub page: MediaPage,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaPage {
     #[serde(rename = "pageInfo", default)]
     pub page_info: Option<PageInfo>,
     pub media: Vec<Media>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PageInfo {
     pub total: Option<u32>,
     #[serde(rename = "currentPage")]
@@ -186,13 +186,13 @@ pub struct PageInfo {
 
 // ─── Character ───────────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CharacterData {
     #[serde(rename = "Character")]
     pub character: Character,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Character {
     pub id: u64,
     pub name: CharacterName,
@@ -203,7 +203,7 @@ pub struct Character {
     pub media: CharacterMediaConnection,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CharacterName {
     pub full: Option<String>,
     pub native: Option<String>,
@@ -215,12 +215,12 @@ impl CharacterName {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CharacterImage {
     pub large: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CharacterMediaConnection {
     #[serde(default)]
     pub nodes: Vec<CharacterMediaNode>,
@@ -228,26 +228,26 @@ pub struct CharacterMediaConnection {
     pub edges: Vec<CharacterMediaEdge>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CharacterMediaEdge {
     pub node: CharacterMediaNode,
     #[serde(rename = "voiceActors", default)]
     pub voice_actors: Vec<StaffShort>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffShort {
     pub name: StaffShortName,
     #[serde(rename = "siteUrl")]
     pub site_url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffShortName {
     pub full: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CharacterMediaNode {
     pub title: MediaTitle,
     #[serde(rename = "type")]
@@ -260,13 +260,13 @@ pub struct CharacterMediaNode {
 
 // ─── Studio ──────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StudioData {
     #[serde(rename = "Studio")]
     pub studio: Studio,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Studio {
     pub id: u64,
     pub name: String,
@@ -277,12 +277,12 @@ pub struct Studio {
     pub media: StudioMediaConnection,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StudioMediaConnection {
     pub nodes: Vec<StudioMediaNode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StudioMediaNode {
     pub title: MediaTitle,
     #[serde(rename = "seasonYear")]
@@ -296,13 +296,13 @@ pub struct StudioMediaNode {
 
 // ─── Staff ───────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffData {
     #[serde(rename = "Staff")]
     pub staff: Staff,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Staff {
     pub id: u64,
     pub name: StaffNameFull,
@@ -316,7 +316,7 @@ pub struct Staff {
     pub staff_media: StaffMediaConnection,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffNameFull {
     pub full: Option<String>,
     pub native: Option<String>,
@@ -328,17 +328,17 @@ impl StaffNameFull {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffImage {
     pub large: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffMediaConnection {
     pub nodes: Vec<StaffMediaNode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffMediaNode {
     pub title: MediaTitle,
     #[serde(rename = "type")]
@@ -349,31 +349,31 @@ pub struct StaffMediaNode {
 
 // ─── Recommendations ──────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecommendationData {
     #[serde(rename = "Media")]
     pub media: MediaRecommendationInfo,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaRecommendationInfo {
     pub id: u64,
     pub title: MediaTitle,
     pub recommendations: RecommendationConnection,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecommendationConnection {
     pub nodes: Vec<RecommendationNode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecommendationNode {
     #[serde(rename = "mediaRecommendation")]
     pub media_recommendation: Option<MediaRecommendationNodeInner>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaRecommendationNodeInner {
     pub title: MediaTitle,
     #[serde(rename = "siteUrl")]
@@ -382,13 +382,13 @@ pub struct MediaRecommendationNodeInner {
 
 // ─── Favourites ───────────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FavouritesData {
     #[serde(rename = "User")]
     pub user: UserFavourites,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserFavourites {
     pub name: String,
     #[serde(rename = "siteUrl")]
@@ -396,7 +396,7 @@ pub struct UserFavourites {
     pub favourites: Favourites,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Favourites {
     pub anime: FavouriteMediaConnection,
     pub manga: FavouriteMediaConnection,
@@ -404,36 +404,36 @@ pub struct Favourites {
     pub studios: FavouriteStudioConnection,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FavouriteMediaConnection {
     pub nodes: Vec<FavouriteMediaNode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FavouriteMediaNode {
     pub title: MediaTitle,
     #[serde(rename = "siteUrl")]
     pub site_url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FavouriteCharacterConnection {
     pub nodes: Vec<FavouriteCharacterNode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FavouriteCharacterNode {
     pub name: CharacterName,
     #[serde(rename = "siteUrl")]
     pub site_url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FavouriteStudioConnection {
     pub nodes: Vec<FavouriteStudioNode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FavouriteStudioNode {
     pub name: String,
     #[serde(rename = "siteUrl")]
@@ -442,13 +442,13 @@ pub struct FavouriteStudioNode {
 
 // ─── User Profile ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserData {
     #[serde(rename = "User")]
     pub user: AniListUser,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AniListUser {
     pub id: u64,
     pub name: String,
@@ -459,18 +459,18 @@ pub struct AniListUser {
     pub statistics: UserStatistics,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserAvatar {
     pub large: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserStatistics {
     pub anime: AnimeStats,
     pub manga: MangaStats,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimeStats {
     pub count: u32,
     #[serde(rename = "episodesWatched")]
@@ -483,13 +483,13 @@ pub struct AnimeStats {
     pub genres: Vec<UserGenreStatistic>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserGenreStatistic {
     pub genre: String,
     pub count: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MangaStats {
     pub count: u32,
     #[serde(rename = "chaptersRead")]
@@ -500,24 +500,24 @@ pub struct MangaStats {
 
 // ─── Media List Collection ───────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaListCollectionData {
     #[serde(rename = "MediaListCollection")]
     pub collection: MediaListCollection,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaListCollection {
     pub lists: Vec<MediaList>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaList {
     pub name: String,
     pub entries: Vec<MediaListEntry>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaListEntry {
     pub status: String,
     pub score: f32,
@@ -525,7 +525,7 @@ pub struct MediaListEntry {
     pub media: MediaListNode,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaListNode {
     pub id: u64,
     pub title: MediaTitle,
@@ -535,7 +535,7 @@ pub struct MediaListNode {
 
 // ─── Genre Collection ────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenreCollectionData {
     #[serde(rename = "GenreCollection")]
     pub genres: Vec<String>,
@@ -543,18 +543,18 @@ pub struct GenreCollectionData {
 
 // ─── Staff Birthday ──────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffBirthdayData {
     #[serde(rename = "Page")]
     pub page: StaffBirthdayPage,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffBirthdayPage {
     pub staff: Vec<StaffBirthday>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaffBirthday {
     pub id: u64,
     pub name: StaffNameFull,

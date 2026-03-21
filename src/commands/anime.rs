@@ -1,4 +1,3 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_anime,
     models::bot_data::{Context, Error},

@@ -1,4 +1,3 @@
-use poise::serenity_prelude as serenity;
 use crate::models::bot_data::{Context, Error};
 
 /// Show a list of all available commands.

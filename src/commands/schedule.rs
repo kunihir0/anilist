@@ -3,39 +3,7 @@ use crate::models::bot_data::{Context, Error};
 use crate::store::{ScheduleEntry, ContentType};
 use crate::tasks::scheduler::register_job;
 use std::sync::Arc;
-
-async fn check_mod(ctx: Context<'_>) -> Result<bool, Error> {
-    let guild_id = match ctx.guild_id() {
-        Some(id) => id,
-        None => return Ok(false),
-    };
-
-    let member = match ctx.author_member().await {
-        Some(m) => m,
-        None => return Ok(false),
-    };
-
-    // Guild owners can always manage schedules
-    if let Some(owner_id) = ctx.cache().guild(guild_id).map(|g| g.owner_id) {
-        if member.user.id == owner_id {
-            return Ok(true);
-        }
-    }
-
-    // Admins can always manage schedules
-    if member.permissions.map_or(false, |p| p.administrator()) {
-        return Ok(true);
-    }
-
-    // Check for custom mod role
-    if let Some(mod_role_id) = ctx.data().store.get_mod_role(guild_id.get()).await {
-        if member.roles.contains(&serenity::RoleId::new(mod_role_id)) {
-            return Ok(true);
-        }
-    }
-
-    Ok(false)
-}
+use crate::utils::permissions::check_admin_or_mod;
 
 #[derive(Debug, poise::ChoiceParameter, Clone, Copy, PartialEq, Eq)]
 pub enum ScheduleContentType {
@@ -86,12 +54,12 @@ pub async fn add(
     #[description = "Cron expression (e.g. '0 9 * * *' for daily at 9am)"] cron: String,
     #[description = "Timezone (e.g. 'UTC')"] timezone: Option<String>,
 ) -> Result<(), Error> {
-    if !check_mod(ctx).await? {
+    if !check_admin_or_mod(ctx).await? {
         ctx.say("You don't have permission to manage schedules.").await?;
         return Ok(());
     }
 
-    let guild_id = ctx.guild_id().unwrap();
+    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?;
     let id = rand::random::<u32>().to_string(); // Simple ID generation
     
     let entry = ScheduleEntry {
@@ -123,12 +91,12 @@ pub async fn remove(
     ctx: Context<'_>,
     #[description = "ID of the schedule to remove"] id: String,
 ) -> Result<(), Error> {
-    if !check_mod(ctx).await? {
+    if !check_admin_or_mod(ctx).await? {
         ctx.say("You don't have permission to manage schedules.").await?;
         return Ok(());
     }
 
-    let guild_id = ctx.guild_id().unwrap();
+    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?;
     if ctx.data().store.remove_schedule(guild_id.get(), &id).await? {
         ctx.say(format!("Removed schedule `{}`.", id)).await?;
     } else {
@@ -140,12 +108,12 @@ pub async fn remove(
 /// List all active schedules for this guild.
 #[poise::command(slash_command, prefix_command, guild_only)]
 pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
-    if !check_mod(ctx).await? {
+    if !check_admin_or_mod(ctx).await? {
         ctx.say("You don't have permission to view schedules.").await?;
         return Ok(());
     }
 
-    let guild_id = ctx.guild_id().unwrap();
+    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?;
     let schedules = ctx.data().store.list_schedules(guild_id.get()).await;
 
     if schedules.is_empty() {
@@ -173,12 +141,12 @@ pub async fn pause(
     ctx: Context<'_>,
     #[description = "ID of the schedule to toggle"] id: String,
 ) -> Result<(), Error> {
-    if !check_mod(ctx).await? {
+    if !check_admin_or_mod(ctx).await? {
         ctx.say("You don't have permission to manage schedules.").await?;
         return Ok(());
     }
 
-    let guild_id = ctx.guild_id().unwrap();
+    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?;
     match ctx.data().store.toggle_schedule(guild_id.get(), &id).await? {
         Some(true) => { ctx.say(format!("Schedule `{}` is now **active**.", id)).await?; },
         Some(false) => { ctx.say(format!("Schedule `{}` is now **paused**.", id)).await?; },

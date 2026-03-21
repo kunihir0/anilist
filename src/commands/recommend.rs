@@ -1,11 +1,8 @@
 use poise::CreateReply;
 use crate::{
     api::anilist::fetch_watchlist,
-    models::bot_data::{Context, Error, MediaType},
-    utils::{
-        embeds::media_list_embed,
-        errors::reply_error,
-    },
+    models::bot_data::{Context, Error},
+    utils::embeds::media_list_embed,
 };
 use std::collections::HashSet;
 
@@ -63,7 +60,7 @@ pub async fn compare(
     }
 
     // Convert recommendations to minimal Media objects for the embed
-    use crate::models::responses::{Media, MediaTitle};
+    use crate::models::responses::Media;
     let media_recs: Vec<Media> = recommendations.into_iter()
         .take(10)
         .map(|r| Media {

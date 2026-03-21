@@ -1,102 +1,89 @@
-use poise::serenity_prelude::CreateEmbed;
-use poise::CreateReply;
+use poise::serenity_prelude::{self as serenity, CreateEmbed};
+use crate::models::bot_data::{Context, Error, BotError};
+use crate::api::anilist::AniListError;
 
-use crate::api::anilist::{AniListError, AniListErrorKind};
-use crate::models::bot_data::{Context, Error};
-
-// ─── Colour palette ───────────────────────────────────────────────────────────
-const RED:    u32 = 0xe74c3c;
-const ORANGE: u32 = 0xe67e22;
+const RED: u32 = 0xe74c3c;
 const YELLOW: u32 = 0xf1c40f;
-const GREY:   u32 = 0x95a5a6;
+const ORANGE: u32 = 0xe67e22;
 
-// ─── Categorised error embed ──────────────────────────────────────────────────
-
-/// Build a rich error embed whose title, colour, and advice vary by error kind.
-///
-/// Downcasts `err` to `AniListError` for structured handling; falls back to a
-/// generic embed for any other error type.
-pub fn error_embed_from(err: &Error) -> CreateEmbed {
-    if let Some(al) = err.downcast_ref::<AniListError>() {
-        return anilist_error_embed(al);
-    }
-
-    // Generic fallback
+/// Create a generic error embed.
+pub fn error_embed(msg: &str) -> CreateEmbed {
     CreateEmbed::new()
-        .title("Something went wrong")
-        .description(format!("```\n{err}\n```"))
-        .colour(poise::serenity_prelude::Colour::new(RED))
-        .footer(poise::serenity_prelude::CreateEmbedFooter::new(
-            "If this keeps happening, the bot may be misconfigured.",
-        ))
+        .title("Error")
+        .description(msg)
+        .colour(serenity::Colour::new(RED))
 }
 
-fn anilist_error_embed(err: &AniListError) -> CreateEmbed {
-    let (colour, title, advice) = match err.kind {
-        AniListErrorKind::NotFound => (
-            GREY,
-            "Not Found",
-            "Double-check the spelling. AniList search is exact — try the Romaji or English title.",
-        ),
-        AniListErrorKind::RateLimit => (
+/// Create an embed specifically for AniList API errors.
+pub fn anilist_error_embed(err: &AniListError) -> CreateEmbed {
+    let (colour, title, advice) = match err {
+        AniListError::NotFound { .. } => (
             YELLOW,
+            "Not Found",
+            "Try adjusting your search terms or checking the spelling."
+        ),
+        AniListError::RateLimit => (
+            ORANGE,
             "Rate Limited",
-            "The bot has sent too many requests to AniList. Wait a few seconds and try again.",
+            "AniList allows 90 requests per minute. Please wait a moment before trying again."
         ),
-        AniListErrorKind::Network => (
-            ORANGE,
-            "Network Error",
-            "Could not reach the AniList API. This is usually temporary — try again shortly.",
-        ),
-        AniListErrorKind::Decode => (
-            ORANGE,
-            "Unexpected Response",
-            "AniList returned data in an unexpected format. The API may have changed.",
-        ),
-        AniListErrorKind::ApiError => (
+        AniListError::Api { .. } => (
             RED,
             "AniList API Error",
-            "AniList returned an error. See the detail below.",
+            "The AniList API returned an error. This might be a temporary issue."
+        ),
+        AniListError::Network(_) => (
+            RED,
+            "Network Error",
+            "Failed to connect to AniList. Check your internet connection or try again later."
+        ),
+        AniListError::Decode(_) => (
+            RED,
+            "Decoding Error",
+            "Received an unexpected response format from AniList."
         ),
     };
 
     let mut embed = CreateEmbed::new()
-        .title(format!("❌  {title}"))
-        .colour(poise::serenity_prelude::Colour::new(colour))
-        .field("Detail", format!("```\n{}\n```", err.message), false)
-        .field("Advice", advice, false);
+        .title(title)
+        .colour(serenity::Colour::new(colour))
+        .footer(serenity::CreateEmbedFooter::new(advice));
 
-    if let Some(code) = err.status {
-        embed = embed.footer(poise::serenity_prelude::CreateEmbedFooter::new(
-            format!("HTTP status {code}"),
-        ));
+    match err {
+        AniListError::Api { message, status } => {
+            embed = embed.field("Message", format!("```\n{}\n```", message), false);
+            if let Some(code) = status {
+                embed = embed.field("Status Code", code.to_string(), true);
+            }
+        }
+        AniListError::NotFound { message } => {
+            embed = embed.field("Message", format!("```\n{}\n```", message), false);
+        }
+        AniListError::Network(msg) | AniListError::Decode(msg) => {
+            embed = embed.field("Details", format!("```\n{}\n```", msg), false);
+        }
+        AniListError::RateLimit => {}
     }
 
     embed
 }
 
-// ─── Not-found helper ─────────────────────────────────────────────────────────
+/// Standardized error reply function for commands.
+pub async fn reply_error(ctx: Context<'_>, err: &Error) -> Result<(), Error> {
+    let embed = match err {
+        BotError::Api(al_err) => anilist_error_embed(al_err),
+        _ => error_embed(&err.to_string()),
+    };
 
-/// Convenience embed for empty result sets (not an API error, just no match).
-pub fn not_found_embed(entity: &str, query: &str) -> CreateEmbed {
-    CreateEmbed::new()
-        .title(format!("❌  {entity} Not Found"))
-        .description(format!(
-            "No results for **{query}**.\nTry a different spelling or use the Romaji title."
-        ))
-        .colour(poise::serenity_prelude::Colour::new(GREY))
+    let reply = poise::CreateReply::default().embed(embed).ephemeral(true);
+    let _ = ctx.send(reply).await;
+    Ok(())
 }
 
-// ─── Command-level error reply ────────────────────────────────────────────────
-
-/// Send an ephemeral error reply built from any `Error`.
-/// Call this at the end of every `Err` arm in command handlers.
-pub async fn reply_error(ctx: Context<'_>, err: &Error) -> Result<(), Error> {
-    ctx.send(
-        CreateReply::default()
-            .embed(error_embed_from(err))
-            .ephemeral(true),
-    )
-    .await?;
-    Ok(())
+/// Specific embed for "No results found" (not a hard error).
+pub fn not_found_embed(entity: &str, query: &str) -> CreateEmbed {
+    CreateEmbed::new()
+        .title(format!("No {} Found", entity))
+        .description(format!("Could not find any results for `{}`.", query))
+        .colour(serenity::Colour::new(YELLOW))
 }

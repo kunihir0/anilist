@@ -27,7 +27,7 @@ pub async fn set(
                 title: media.title.preferred().to_string(),
                 channel_id: ctx.channel_id().get(),
             };
-            data.store.set_watch_party(ctx.guild_id().unwrap().get(), party).await?;
+            data.store.set_watch_party(ctx.guild_id().ok_or("This command must be run in a server")?.get(), party).await?;
             ctx.say(format!("Watch party series set to: **{}**", media.title.preferred())).await?;
         }
         Err(e) => {
@@ -42,7 +42,7 @@ pub async fn set(
 pub async fn next(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
-    let settings = data.store.get_settings(ctx.guild_id().unwrap().get()).await;
+    let settings = data.store.get_settings(ctx.guild_id().ok_or("This command must be run in a server")?.get()).await;
     
     if let Some(party) = settings.watch_party {
         match fetch_media_by_title(&data.http_client, &data.cache, &data.rate_limiter, &party.title).await {

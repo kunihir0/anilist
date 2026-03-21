@@ -131,7 +131,45 @@ impl MediaSort {
     }
 }
 
+// ─── Error Handling ───────────────────────────────────────────────────────────
+
+#[derive(Debug, thiserror::Error)]
+pub enum BotError {
+    #[error("API Error: {0}")]
+    Api(#[from] crate::api::anilist::AniListError),
+    #[error("Network Error: {0}")]
+    Network(#[from] reqwest::Error),
+    #[error("Serenity Error: {0}")]
+    Discord(#[from] poise::serenity_prelude::Error),
+    #[error("IO Error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("JSON Error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("Scheduler Error: {0}")]
+    Scheduler(#[from] tokio_cron_scheduler::JobSchedulerError),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
+impl From<&str> for BotError {
+    fn from(s: &str) -> Self {
+        BotError::Internal(s.to_string())
+    }
+}
+
+impl From<String> for BotError {
+    fn from(s: String) -> Self {
+        BotError::Internal(s)
+    }
+}
+
+impl From<Box<dyn std::error::Error + Send + Sync>> for BotError {
+    fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        BotError::Internal(err.to_string())
+    }
+}
+
 // ─── Poise type aliases ───────────────────────────────────────────────────────
 
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Error = BotError;
 pub type Context<'a> = poise::Context<'a, Data, Error>;

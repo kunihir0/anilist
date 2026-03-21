@@ -10,7 +10,7 @@ use futures::StreamExt;
 pub async fn quiz(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
-    let guild_id = ctx.guild_id().unwrap().get();
+    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?.get();
     let settings = data.store.get_settings(guild_id).await;
     let accent_color = settings.accent_color;
 
