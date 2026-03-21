@@ -38,7 +38,7 @@ async fn check_admin(ctx: Context<'_>) -> Result<bool, Error> {
 #[poise::command(
     slash_command,
     prefix_command,
-    subcommands("mod_role", "list"),
+    subcommands("mod_role", "list", "color"),
     guild_only
 )]
 pub async fn settings(_ctx: Context<'_>) -> Result<(), Error> {
@@ -63,6 +63,38 @@ pub async fn mod_role(
     Ok(())
 }
 
+/// Set the accent color for embeds in this server.
+#[poise::command(slash_command, prefix_command, guild_only)]
+pub async fn color(
+    ctx: Context<'_>,
+    #[description = "Hex color code (e.g. 0xFF0000)"] color: String,
+) -> Result<(), Error> {
+    if !check_admin(ctx).await? {
+        ctx.say("You don't have permission to manage settings.").await?;
+        return Ok(());
+    }
+
+    let color_val = if color.starts_with("0x") {
+        u32::from_str_radix(&color[2..], 16)
+    } else if color.starts_with('#') {
+        u32::from_str_radix(&color[1..], 16)
+    } else {
+        u32::from_str_radix(&color, 16)
+    };
+
+    match color_val {
+        Ok(c) => {
+            let guild_id = ctx.guild_id().unwrap().get();
+            ctx.data().store.set_accent_color(guild_id, c).await?;
+            ctx.say(format!("Accent color updated to `0x{:06X}`.", c)).await?;
+        }
+        Err(_) => {
+            ctx.say("Invalid color code. Use hex format like `0xABCDEF` or `#ABCDEF`.").await?;
+        }
+    }
+    Ok(())
+}
+
 /// Show current guild settings.
 #[poise::command(slash_command, prefix_command, guild_only)]
 pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
@@ -79,10 +111,16 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
         None => "Not set".to_string(),
     };
 
+    let color = match settings.accent_color {
+        Some(c) => format!("0x{:06X}", c),
+        None => "Default (AniList Blue)".to_string(),
+    };
+
     ctx.send(poise::CreateReply::default().embed(
         serenity::CreateEmbed::new()
             .title("Guild Settings")
             .field("Moderator Role", mod_role, true)
+            .field("Accent Color", color, true)
     )).await?;
 
     Ok(())

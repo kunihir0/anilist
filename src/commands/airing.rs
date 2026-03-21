@@ -15,6 +15,12 @@ pub async fn airing(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
     let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
     match fetch_airing(&data.http_client, &data.cache, &data.rate_limiter).await {
         Ok(shows) if shows.is_empty() => {
@@ -28,7 +34,7 @@ pub async fn airing(ctx: Context<'_>) -> Result<(), Error> {
                 .iter()
                 .enumerate()
                 .map(|(i, chunk)| {
-                    airing_page_embed(chunk, i + 1, total_pages, prefs.title_language.clone())
+                    airing_page_embed(chunk, i + 1, total_pages, prefs.title_language.clone(), accent_color)
                 })
                 .collect();
 

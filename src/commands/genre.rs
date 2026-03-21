@@ -34,13 +34,19 @@ pub async fn genre(
     ctx.defer().await?;
     let data = ctx.data();
     let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
     let kind = media_type.unwrap_or(MediaType::Anime);
 
     match fetch_genre(&data.http_client, &data.cache, &data.rate_limiter, &genre, kind.as_str()).await {
         Ok(media) => {
             let title = format!("Top {} - {}", kind.name(), genre);
-            ctx.send(CreateReply::default().embed(media_list_embed(&media, &title, prefs.title_language))).await?;
+            ctx.send(CreateReply::default().embed(media_list_embed(&media, &title, prefs.title_language, accent_color))).await?;
         }
         Err(e) => {
             tracing::warn!("Genre fetch failed: {e}");

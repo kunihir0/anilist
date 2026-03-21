@@ -1,0 +1,87 @@
+use poise::serenity_prelude as serenity;
+use crate::models::bot_data::{Context, Error};
+use crate::store::ServerListEntry;
+use crate::api::anilist::fetch_media_by_title;
+use crate::utils::embeds::server_list_embed;
+
+/// Manage the shared server anime list.
+#[poise::command(
+    slash_command,
+    prefix_command,
+    subcommands("add", "list", "watched"),
+    guild_only
+)]
+pub async fn serverlist(_ctx: Context<'_>) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Add a title to the shared server list.
+#[poise::command(slash_command, prefix_command, guild_only)]
+pub async fn add(
+    ctx: Context<'_>,
+    #[description = "Title to add"] title: String,
+) -> Result<(), Error> {
+    ctx.defer().await?;
+    let data = ctx.data();
+    
+    match fetch_media_by_title(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
+        Ok(media) => {
+            let entry = ServerListEntry {
+                id: rand::random::<u16>().to_string(),
+                media_id: media.id,
+                title: media.title.preferred().to_string(),
+                added_by: ctx.author().id.get(),
+                watched: false,
+            };
+            data.store.add_to_server_list(ctx.guild_id().unwrap().get(), entry).await?;
+            ctx.say(format!("Added **{}** to the server list.", media.title.preferred())).await?;
+        }
+        Err(e) => {
+            ctx.say(format!("Could not find media: {}", e)).await?;
+        }
+    }
+    Ok(())
+}
+
+/// List all titles in the shared server list.
+#[poise::command(slash_command, prefix_command, guild_only)]
+pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap().get();
+    let settings = ctx.data().store.get_settings(guild_id).await;
+    
+    ctx.send(poise::CreateReply::default().embed(server_list_embed(&settings.server_list, settings.accent_color))).await?;
+    Ok(())
+}
+
+/// Mark a title as watched.
+#[poise::command(slash_command, prefix_command, guild_only)]
+pub async fn watched(
+    ctx: Context<'_>,
+    #[description = "ID of the entry to mark watched"] id: String,
+) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap().get();
+    
+    // Check for mod permissions
+    let member = ctx.author_member().await.ok_or("Not in a guild")?;
+    let mut is_mod = member.permissions.map_or(false, |p| p.administrator());
+    
+    if !is_mod {
+        if let Some(mod_role) = ctx.data().store.get_mod_role(guild_id).await {
+            if member.roles.contains(&serenity::RoleId::new(mod_role)) {
+                is_mod = true;
+            }
+        }
+    }
+
+    if !is_mod {
+        ctx.say("You don't have permission to mark items as watched.").await?;
+        return Ok(());
+    }
+
+    if ctx.data().store.mark_watched(guild_id, &id).await? {
+        ctx.say(format!("Marked entry `{}` as watched.", id)).await?;
+    } else {
+        ctx.say(format!("Entry `{}` not found.", id)).await?;
+    }
+    Ok(())
+}

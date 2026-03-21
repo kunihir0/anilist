@@ -41,6 +41,25 @@ async fn main() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: commands::all(),
+            pre_command: |ctx| {
+                Box::pin(async move {
+                    info!(
+                        "Executing command {} for {} in guild {:?}",
+                        ctx.command().qualified_name,
+                        ctx.author().name,
+                        ctx.guild_id()
+                    );
+                })
+            },
+            post_command: |ctx| {
+                Box::pin(async move {
+                    info!(
+                        "Executed command {} for {}",
+                        ctx.command().qualified_name,
+                        ctx.author().name
+                    );
+                })
+            },
             on_error: |err| {
                 Box::pin(async move {
                     match err {
@@ -52,6 +71,12 @@ async fn main() {
                                 ))
                                 .ephemeral(true);
                             let _ = ctx.send(reply).await;
+                        }
+                        poise::FrameworkError::CooldownHit { remaining_cooldown, ctx, .. } => {
+                            let _ = ctx.say(format!(
+                                "You're using that command too fast! Please wait **{:.1}s**.",
+                                remaining_cooldown.as_secs_f32()
+                            )).await;
                         }
                         other => {
                             if let Err(e) = poise::builtins::on_error(other).await {

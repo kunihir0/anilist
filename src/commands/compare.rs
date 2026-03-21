@@ -12,26 +12,27 @@ use crate::{
 #[poise::command(slash_command, prefix_command)]
 pub async fn compare(
     ctx: Context<'_>,
-    #[description = "First AniList username"]  user1: String,
-    #[description = "Second AniList username"] user2: String,
+    #[description = "First username"] user1: String,
+    #[description = "Second username"] user2: String,
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
-    // Fetch both users concurrently.
-    let (res1, res2) = tokio::join!(
-        fetch_user(&data.http_client, &data.cache, &data.rate_limiter, &user1),
-        fetch_user(&data.http_client, &data.cache, &data.rate_limiter, &user2),
-    );
+    let u1_task = fetch_user(&data.http_client, &data.cache, &data.rate_limiter, &user1);
+    let u2_task = fetch_user(&data.http_client, &data.cache, &data.rate_limiter, &user2);
 
-    match (res1, res2) {
-        (Ok(u1), Ok(u2)) => {
-            ctx.send(CreateReply::default().embed(compare_embed(&u1, &u2))).await?;
+    match tokio::try_join!(u1_task, u2_task) {
+        Ok((u1, u2)) => {
+            ctx.send(CreateReply::default().embed(compare_embed(&u1, &u2, accent_color))).await?;
         }
-        (Err(e), _) => {
-            reply_error(ctx, &e).await?;
-        }
-        (_, Err(e)) => {
+        Err(e) => {
+            tracing::warn!("Comparison fetch failed: {e}");
             reply_error(ctx, &e).await?;
         }
     }

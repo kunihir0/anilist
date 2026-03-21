@@ -16,10 +16,16 @@ pub async fn profile(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
     match fetch_user(&data.http_client, &data.cache, &data.rate_limiter, &username).await {
         Ok(user) => {
-            ctx.send(CreateReply::default().embed(user_embed(&user))).await?;
+            ctx.send(CreateReply::default().embed(user_embed(&user, accent_color))).await?;
         }
         Err(e) => {
             tracing::warn!("User fetch failed for {username:?}: {e}");

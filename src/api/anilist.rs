@@ -3,7 +3,7 @@ use serde_json::json;
 
 use crate::models::responses::{
     AniListApiError, AniListErrorResponse, AniListUser, Character, CharacterData,
-    FavouritesData, GenreCollectionData, GraphQlResponse, Media, MediaListCollectionData,
+    GenreCollectionData, GraphQlResponse, Media, MediaListCollectionData,
     MediaRecommendationInfo, MediaSearchData, RecommendationData, Staff, StaffBirthday,
     StaffBirthdayData, StaffData, Studio, StudioData, UserData, UserFavourites, MediaListCollection,
 };
@@ -237,8 +237,6 @@ pub async fn fetch_airing(
     rate_limiter: &RateLimiter,
 ) -> Result<Vec<Media>, Error> {
     let key = "airing:current".to_string();
-    // Short TTL for airing data — we still respect the cache set by the
-    // caller (2 min TTL in Data::new for airing vs 5 min for everything else).
     if let Some(cached) = cache.get::<Vec<Media>>(&key).await {
         return Ok(cached);
     }
@@ -251,11 +249,6 @@ pub async fn fetch_airing(
 }
 
 /// Fetch a random anime or manga ("ANIME" | "MANGA").
-///
-/// AniList does not support `sort: RANDOM` and `lastPage` from pageInfo is
-/// documented as inaccurate. Instead we pick a random page from a fixed pool
-/// of 100 (perPage: 1, popularity-sorted) and fall back to page 1 if the
-/// chosen page returns nothing.
 pub async fn fetch_random(
     client: &Client,
     rate_limiter: &RateLimiter,
@@ -267,7 +260,6 @@ pub async fn fetch_random(
     let data: MediaSearchData =
         graphql_post(client, rate_limiter, queries::RANDOM_PAGE_QUERY, vars).await?;
 
-    // If the chosen page is beyond the actual pool, fall back to page 1.
     if let Some(media) = data.page.media.into_iter().next() {
         return Ok(media);
     }
@@ -284,21 +276,15 @@ pub async fn fetch_random(
         .ok_or_else(|| "No results returned for random query.".into())
 }
 
-/// Pseudo-random page in [1, max] — no extra crate.
-///
-/// Mixes full seconds and nanoseconds so repeated calls within the same
-/// second produce different values. Uses a Xorshift64 step to spread bits.
 fn rand_page(max: u32) -> u32 {
     use std::time::{SystemTime, UNIX_EPOCH};
     let dur = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
 
-    // Combine whole seconds and nanoseconds into one 64-bit seed.
     let mut x: u64 = (dur.as_secs().wrapping_mul(1_000_000_007))
         ^ (dur.subsec_nanos() as u64);
 
-    // One round of Xorshift64 to spread bits across the full range.
     x ^= x << 13;
     x ^= x >> 7;
     x ^= x << 17;
@@ -430,7 +416,6 @@ pub async fn fetch_staff_birthdays(
     let data: StaffBirthdayData =
         graphql_post(client, rate_limiter, queries::STAFF_BIRTHDAY_QUERY, json!({})).await?;
     let results = data.page.staff;
-    // Cache for 1 hour
     cache.set_with_ttl(key, &results, 3600).await;
     Ok(results)
 }
@@ -466,7 +451,7 @@ pub async fn fetch_genres(
     }
     let data: GenreCollectionData =
         graphql_post(client, rate_limiter, queries::GENRE_COLLECTION_QUERY, json!({})).await?;
-    cache.set_with_ttl(key, &data.genres, 86400).await; // Cache for 24h
+    cache.set_with_ttl(key, &data.genres, 86400).await;
     Ok(data.genres)
 }
 
@@ -492,7 +477,6 @@ pub async fn fetch_filtered_media(
         "year": year,
         "sort": sort,
     });
-    // We don't cache this due to the high number of parameter combinations.
     let data: MediaSearchData =
         graphql_post(client, rate_limiter, queries::FILTER_QUERY, vars).await?;
     Ok(data.page.media)

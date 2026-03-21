@@ -18,6 +18,12 @@ pub async fn manga(
     ctx.defer().await?;
     let data = ctx.data();
     let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
     match fetch_manga(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
         Ok(results) if results.is_empty() => {
@@ -26,7 +32,7 @@ pub async fn manga(
         Ok(results) => {
             let pages: Vec<_> = results
                 .iter()
-                .map(|m| media_embed(m, "Manga", prefs.title_language.clone()))
+                .map(|m| media_embed(m, "Manga", prefs.title_language.clone(), accent_color))
                 .collect();
             paginate(ctx, pages).await?;
         }

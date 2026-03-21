@@ -23,10 +23,16 @@ pub async fn search(
     ctx.defer().await?;
     let data = ctx.data();
     let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
     match fetch_staff(&data.http_client, &data.cache, &data.rate_limiter, &name).await {
         Ok(staff) => {
-            ctx.send(CreateReply::default().embed(staff_embed(&staff, prefs.title_language))).await?;
+            ctx.send(CreateReply::default().embed(staff_embed(&staff, prefs.title_language, accent_color))).await?;
         }
         Err(e) => {
             tracing::warn!("Staff fetch failed for {name:?}: {e}");
@@ -42,10 +48,16 @@ pub async fn search(
 pub async fn today(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
     match fetch_staff_birthdays(&data.http_client, &data.cache, &data.rate_limiter).await {
         Ok(staff) => {
-            ctx.send(CreateReply::default().embed(staff_birthday_embed(&staff))).await?;
+            ctx.send(CreateReply::default().embed(staff_birthday_embed(&staff, accent_color))).await?;
         }
         Err(e) => {
             tracing::warn!("Staff birthdays fetch failed: {e}");

@@ -4,15 +4,20 @@ use crate::models::responses::{
     AniListUser, Character, Media, MediaRecommendationInfo, Staff, StaffBirthday, Studio,
     UserFavourites, MediaListCollection,
 };
-use crate::store::TitleLanguage;
+use crate::store::{TitleLanguage, ServerListEntry};
+use std::collections::HashMap;
 
 const ANILIST_BLUE: u32 = 0x02a9ff;
 const PURPLE:       u32 = 0x9b59b6;
 const TEAL:         u32 = 0x1abc9c;
 
+fn get_color(guild_color: Option<u32>, default: u32) -> serenity::Colour {
+    serenity::Colour::new(guild_color.unwrap_or(default))
+}
+
 // ─── Media (anime / manga / upcoming / random / filter) ────────────────────────
 
-pub fn media_embed(media: &Media, media_type: &str, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn media_embed(media: &Media, media_type: &str, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let description = media
         .description.as_deref()
         .map(clean_html)
@@ -34,7 +39,7 @@ pub fn media_embed(media: &Media, media_type: &str, lang: Option<TitleLanguage>)
         .title(title)
         .url(&media.site_url)
         .description(&description)
-        .colour(serenity::Colour::new(ANILIST_BLUE))
+        .colour(get_color(guild_color, ANILIST_BLUE))
         .footer(serenity::CreateEmbedFooter::new(format!("{media_type} • AniList ID {}", media.id)))
         .field("Format", format, true)
         .field("Status", status, true)
@@ -65,10 +70,10 @@ pub fn media_embed(media: &Media, media_type: &str, lang: Option<TitleLanguage>)
 
 // ─── Airing embed (single show, for airing list page) ────────────────────────
 
-pub fn airing_page_embed(shows: &[Media], page: usize, total_pages: usize, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn airing_page_embed(shows: &[Media], page: usize, total_pages: usize, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title("Currently Airing")
-        .colour(serenity::Colour::new(TEAL))
+        .colour(get_color(guild_color, TEAL))
         .footer(serenity::CreateEmbedFooter::new(format!("Page {page} of {total_pages}")));
 
     for show in shows {
@@ -92,10 +97,11 @@ pub fn upcoming_page_embed(
     page: usize,
     total_pages: usize,
     lang: Option<TitleLanguage>,
+    guild_color: Option<u32>,
 ) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title(format!("Upcoming — {season} {year}"))
-        .colour(serenity::Colour::new(PURPLE))
+        .colour(get_color(guild_color, PURPLE))
         .footer(serenity::CreateEmbedFooter::new(format!("Page {page} of {total_pages}")));
 
     for show in shows {
@@ -110,7 +116,7 @@ pub fn upcoming_page_embed(
 
 // ─── Character embed ──────────────────────────────────────────────────────────
 
-pub fn character_embed(character: &Character, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn character_embed(character: &Character, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let description = character
         .description.as_deref()
         .map(clean_html)
@@ -142,7 +148,7 @@ pub fn character_embed(character: &Character, lang: Option<TitleLanguage>) -> Cr
         .title(if native.is_empty() { name.to_string() } else { format!("{name}  ({native})") })
         .url(&character.site_url)
         .description(&description)
-        .colour(serenity::Colour::new(PURPLE))
+        .colour(get_color(guild_color, PURPLE))
         .footer(serenity::CreateEmbedFooter::new(format!("AniList Character ID {}", character.id)));
 
     if !appearances.is_empty() {
@@ -157,7 +163,7 @@ pub fn character_embed(character: &Character, lang: Option<TitleLanguage>) -> Cr
 
 // ─── Studio embed ─────────────────────────────────────────────────────────────
 
-pub fn studio_embed(studio: &Studio, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn studio_embed(studio: &Studio, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let kind = if studio.is_animation_studio {
         "Animation Studio"
     } else {
@@ -182,7 +188,7 @@ pub fn studio_embed(studio: &Studio, lang: Option<TitleLanguage>) -> CreateEmbed
     let mut embed = CreateEmbed::new()
         .title(&studio.name)
         .url(&studio.site_url)
-        .colour(serenity::Colour::new(TEAL))
+        .colour(get_color(guild_color, TEAL))
         .footer(serenity::CreateEmbedFooter::new(format!("{kind} • AniList ID {}", studio.id)));
 
     if !works.is_empty() {
@@ -194,7 +200,7 @@ pub fn studio_embed(studio: &Studio, lang: Option<TitleLanguage>) -> CreateEmbed
 
 // ─── Staff embed ─────────────────────────────────────────────────────────────
 
-pub fn staff_embed(staff: &Staff, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn staff_embed(staff: &Staff, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let description = staff
         .description.as_deref()
         .map(clean_html)
@@ -221,7 +227,7 @@ pub fn staff_embed(staff: &Staff, lang: Option<TitleLanguage>) -> CreateEmbed {
         .title(if native.is_empty() { format!("{name}{bday}") } else { format!("{name}  ({native}){bday}") })
         .url(&staff.site_url)
         .description(&description)
-        .colour(serenity::Colour::new(PURPLE))
+        .colour(get_color(guild_color, PURPLE))
         .footer(serenity::CreateEmbedFooter::new(format!("AniList Staff ID {}", staff.id)));
 
     if !works.is_empty() {
@@ -236,10 +242,10 @@ pub fn staff_embed(staff: &Staff, lang: Option<TitleLanguage>) -> CreateEmbed {
 
 // ─── Staff Birthday embed ────────────────────────────────────────────────────
 
-pub fn staff_birthday_embed(staff_list: &[StaffBirthday]) -> CreateEmbed {
+pub fn staff_birthday_embed(staff_list: &[StaffBirthday], guild_color: Option<u32>) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title("🎂 Today's Staff Birthdays")
-        .colour(serenity::Colour::new(PURPLE))
+        .colour(get_color(guild_color, PURPLE))
         .footer(serenity::CreateEmbedFooter::new("Powered by AniList"));
 
     if staff_list.is_empty() {
@@ -258,7 +264,7 @@ pub fn staff_birthday_embed(staff_list: &[StaffBirthday]) -> CreateEmbed {
 
 // ─── Recommendations embed ───────────────────────────────────────────────────
 
-pub fn recommendations_embed(media: &MediaRecommendationInfo, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn recommendations_embed(media: &MediaRecommendationInfo, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let title = media.title.get_title(lang.clone());
     let recs: String = media
         .recommendations
@@ -273,17 +279,17 @@ pub fn recommendations_embed(media: &MediaRecommendationInfo, lang: Option<Title
         .title(format!("Recommendations for {title}"))
         .url(format!("https://anilist.co/anime/{}/recommendations", media.id))
         .description(if recs.is_empty() { "No recommendations found.".to_string() } else { recs })
-        .colour(serenity::Colour::new(ANILIST_BLUE))
+        .colour(get_color(guild_color, ANILIST_BLUE))
 }
 
 // ─── Relations embed ─────────────────────────────────────────────────────────
 
-pub fn relations_embed(media: &Media, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn relations_embed(media: &Media, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let title = media.title.get_title(lang.clone());
     let mut embed = CreateEmbed::new()
         .title(format!("Relations for {title}"))
         .url(&media.site_url)
-        .colour(serenity::Colour::new(ANILIST_BLUE));
+        .colour(get_color(guild_color, ANILIST_BLUE));
 
     if let Some(relations) = &media.relations {
         let list: String = relations.edges.iter()
@@ -306,7 +312,7 @@ pub fn relations_embed(media: &Media, lang: Option<TitleLanguage>) -> CreateEmbe
 
 // ─── Media list embed (trending / genre / filter) ─────────────────────────────────────
 
-pub fn media_list_embed(media: &[Media], title: &str, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn media_list_embed(media: &[Media], title: &str, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let list: String = media
         .iter()
         .enumerate()
@@ -320,15 +326,15 @@ pub fn media_list_embed(media: &[Media], title: &str, lang: Option<TitleLanguage
     CreateEmbed::new()
         .title(title)
         .description(if list.is_empty() { "No results found.".to_string() } else { list })
-        .colour(serenity::Colour::new(ANILIST_BLUE))
+        .colour(get_color(guild_color, ANILIST_BLUE))
 }
 
 // ─── Watchlist embed ─────────────────────────────────────────────────────────
 
-pub fn watchlist_embed(collection: &MediaListCollection, username: &str, media_type: &str, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn watchlist_embed(collection: &MediaListCollection, username: &str, media_type: &str, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title(format!("{}'s {} Watchlist", username, media_type))
-        .colour(serenity::Colour::new(ANILIST_BLUE));
+        .colour(get_color(guild_color, ANILIST_BLUE));
 
     for list in &collection.lists {
         if list.entries.is_empty() { continue; }
@@ -350,11 +356,11 @@ pub fn watchlist_embed(collection: &MediaListCollection, username: &str, media_t
 
 // ─── Favourites embed ────────────────────────────────────────────────────────
 
-pub fn favourites_embed(user: &UserFavourites, lang: Option<TitleLanguage>) -> CreateEmbed {
+pub fn favourites_embed(user: &UserFavourites, lang: Option<TitleLanguage>, guild_color: Option<u32>) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title(format!("{}'s Favourites", user.name))
         .url(&user.site_url)
-        .colour(serenity::Colour::new(ANILIST_BLUE));
+        .colour(get_color(guild_color, ANILIST_BLUE));
 
     let anime: String = user.favourites.anime.nodes.iter()
         .map(|n| format!("[{}]({})", n.title.get_title(lang.clone()), n.site_url))
@@ -385,7 +391,7 @@ pub fn favourites_embed(user: &UserFavourites, lang: Option<TitleLanguage>) -> C
 
 // ─── User profile embed ───────────────────────────────────────────────────────
 
-pub fn user_embed(user: &AniListUser) -> CreateEmbed {
+pub fn user_embed(user: &AniListUser, guild_color: Option<u32>) -> CreateEmbed {
     let about = user
         .about.as_deref()
         .map(clean_html)
@@ -401,7 +407,7 @@ pub fn user_embed(user: &AniListUser) -> CreateEmbed {
         .title(&user.name)
         .url(&user.site_url)
         .description(&about)
-        .colour(serenity::Colour::new(ANILIST_BLUE))
+        .colour(get_color(guild_color, ANILIST_BLUE))
         .footer(serenity::CreateEmbedFooter::new(format!("AniList User ID {}", user.id)))
         .field("Anime Watched",    anime.count.to_string(),                   true)
         .field("Episodes Watched", anime.episodes_watched.to_string(),        true)
@@ -429,7 +435,7 @@ pub fn user_embed(user: &AniListUser) -> CreateEmbed {
 
 // ─── Compare embed ────────────────────────────────────────────────────────────
 
-pub fn compare_embed(u1: &AniListUser, u2: &AniListUser) -> CreateEmbed {
+pub fn compare_embed(u1: &AniListUser, u2: &AniListUser, guild_color: Option<u32>) -> CreateEmbed {
     fn user_stats(u: &AniListUser) -> String {
         let days  = u.statistics.anime.minutes_watched / 1440;
         let hours = (u.statistics.anime.minutes_watched % 1440) / 60;
@@ -447,10 +453,57 @@ pub fn compare_embed(u1: &AniListUser, u2: &AniListUser) -> CreateEmbed {
 
     CreateEmbed::new()
         .title(format!("{} vs {}", u1.name, u2.name))
-        .colour(serenity::Colour::new(ANILIST_BLUE))
+        .colour(get_color(guild_color, ANILIST_BLUE))
         .footer(serenity::CreateEmbedFooter::new("AniList profile comparison"))
         .field(format!("[{}]({})", u1.name, u1.site_url), user_stats(u1), true)
         .field(format!("[{}]({})", u2.name, u2.site_url), user_stats(u2), true)
+}
+
+// ─── Server List embed ────────────────────────────────────────────────────────
+
+pub fn server_list_embed(entries: &[ServerListEntry], guild_color: Option<u32>) -> CreateEmbed {
+    let mut embed = CreateEmbed::new()
+        .title("Server Anime List")
+        .colour(get_color(guild_color, TEAL));
+
+    if entries.is_empty() {
+        embed = embed.description("The server list is empty. Add something with `/serverlist add`!");
+    } else {
+        let list: String = entries.iter()
+            .map(|e| {
+                let status = if e.watched { "✅" } else { "⏳" };
+                format!("`{}` {} **{}** (added by <@{}>)", e.id, status, e.title, e.added_by)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        embed = embed.description(list);
+    }
+
+    embed
+}
+
+// ─── Leaderboard embed ────────────────────────────────────────────────────────
+
+pub fn leaderboard_embed(scores: &HashMap<u64, u32>, guild_color: Option<u32>) -> CreateEmbed {
+    let mut embed = CreateEmbed::new()
+        .title("Quiz Leaderboard")
+        .colour(get_color(guild_color, 0xFFA500));
+
+    if scores.is_empty() {
+        embed = embed.description("No scores yet. Play with `/quiz`!");
+    } else {
+        let mut sorted: Vec<_> = scores.iter().collect();
+        sorted.sort_by(|a, b| b.1.cmp(a.1));
+
+        let list: String = sorted.iter().enumerate()
+            .take(10)
+            .map(|(i, (id, score))| format!("{}. <@{}> — **{}** wins", i + 1, id, score))
+            .collect::<Vec<_>>()
+            .join("\n");
+        embed = embed.description(list);
+    }
+
+    embed
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────

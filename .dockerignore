@@ -12,3 +12,6 @@ Secrets.toml
 
 # Docs and meta
 README.md
+
+# Bot runtime created related files
+store.json

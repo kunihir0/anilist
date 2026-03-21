@@ -35,6 +35,12 @@ pub async fn filter(
     ctx.defer().await?;
     let data = ctx.data();
     let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
     let media_type_str = media_type.map(|t| t.as_str());
     let format_str = format.map(|f| f.as_str());
@@ -58,7 +64,7 @@ pub async fn filter(
         sort_vec
     ).await {
         Ok(media) => {
-            ctx.send(CreateReply::default().embed(media_list_embed(&media, "Search Results", prefs.title_language))).await?;
+            ctx.send(CreateReply::default().embed(media_list_embed(&media, "Search Results", prefs.title_language, accent_color))).await?;
         }
         Err(e) => {
             tracing::warn!("Filter fetch failed: {e}");

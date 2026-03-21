@@ -6,14 +6,18 @@ mod favourites;
 mod filter;
 mod genre;
 mod help;
+mod leaderboard;
 mod manga;
+mod ping;
 mod prefs;
 mod profile;
 mod quiz;
 mod random;
+mod recommend;
 mod recommendations;
 mod relations;
 pub mod schedule;
+mod serverlist;
 pub mod settings;
 mod staff;
 mod studio;
@@ -49,5 +53,9 @@ pub fn all() -> Vec<poise::Command<Data, Error>> {
         help::help(),
         quiz::quiz(),
         watch::watch(),
+        serverlist::serverlist(),
+        leaderboard::leaderboard(),
+        recommend::recommend(),
+        ping::ping(),
     ]
 }

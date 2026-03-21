@@ -20,6 +20,12 @@ pub async fn upcoming(
     ctx.defer().await?;
     let data = ctx.data();
     let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
     // Default to current season/year if not provided
     let now = Utc::now();
@@ -45,7 +51,7 @@ pub async fn upcoming(
                 .iter()
                 .enumerate()
                 .map(|(i, chunk)| {
-                    upcoming_page_embed(chunk, &season_str, year_val, i + 1, total_pages, prefs.title_language.clone())
+                    upcoming_page_embed(chunk, &season_str, year_val, i + 1, total_pages, prefs.title_language.clone(), accent_color)
                 })
                 .collect();
             paginate(ctx, pages).await?;

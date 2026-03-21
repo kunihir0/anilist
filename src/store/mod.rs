@@ -7,6 +7,20 @@ use std::path::PathBuf;
 pub struct GuildSettings {
     pub mod_role_id: Option<u64>,
     pub watch_party: Option<WatchParty>,
+    pub accent_color: Option<u32>,
+    #[serde(default)]
+    pub server_list: Vec<ServerListEntry>,
+    #[serde(default)]
+    pub quiz_scores: HashMap<u64, u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerListEntry {
+    pub id: String,
+    pub media_id: u64,
+    pub title: String,
+    pub added_by: u64,
+    pub watched: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,6 +126,15 @@ impl Store {
         self.save().await
     }
 
+    pub async fn set_accent_color(&self, guild_id: u64, color: u32) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        {
+            let mut data = self.data.write().await;
+            let entry = data.settings.entry(guild_id).or_insert_with(GuildSettings::default);
+            entry.accent_color = Some(color);
+        }
+        self.save().await
+    }
+
     pub async fn get_settings(&self, guild_id: u64) -> GuildSettings {
         let data = self.data.read().await;
         data.settings.get(&guild_id).cloned().unwrap_or_default()
@@ -122,6 +145,45 @@ impl Store {
             let mut data = self.data.write().await;
             let entry = data.settings.entry(guild_id).or_insert_with(GuildSettings::default);
             entry.watch_party = Some(party);
+        }
+        self.save().await
+    }
+
+    pub async fn add_to_server_list(&self, guild_id: u64, entry: ServerListEntry) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        {
+            let mut data = self.data.write().await;
+            let settings = data.settings.entry(guild_id).or_insert_with(GuildSettings::default);
+            settings.server_list.push(entry);
+        }
+        self.save().await
+    }
+
+    pub async fn mark_watched(&self, guild_id: u64, entry_id: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+        let success = {
+            let mut data = self.data.write().await;
+            if let Some(settings) = data.settings.get_mut(&guild_id) {
+                if let Some(entry) = settings.server_list.iter_mut().find(|e| e.id == entry_id) {
+                    entry.watched = true;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        };
+        if success {
+            self.save().await?;
+        }
+        Ok(success)
+    }
+
+    pub async fn increment_quiz_score(&self, guild_id: u64, user_id: u64) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        {
+            let mut data = self.data.write().await;
+            let settings = data.settings.entry(guild_id).or_insert_with(GuildSettings::default);
+            let score = settings.quiz_scores.entry(user_id).or_insert(0);
+            *score += 1;
         }
         self.save().await
     }

@@ -17,12 +17,18 @@ pub async fn random(
     ctx.defer().await?;
     let data = ctx.data();
     let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
 
     let kind = media_type.unwrap_or(MediaType::Anime);
 
     match fetch_random(&data.http_client, &data.rate_limiter, kind.as_str()).await {
         Ok(media) => {
-            ctx.send(CreateReply::default().embed(media_embed(&media, kind.name(), prefs.title_language))).await?;
+            ctx.send(CreateReply::default().embed(media_embed(&media, kind.name(), prefs.title_language, accent_color))).await?;
         }
         Err(e) => {
             tracing::warn!("Random fetch failed: {e}");
