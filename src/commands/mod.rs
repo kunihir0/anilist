@@ -8,6 +8,8 @@ mod manga;
 mod profile;
 mod random;
 mod recommendations;
+pub mod schedule;
+pub mod settings;
 mod staff;
 mod studio;
 mod trending;
@@ -31,5 +33,7 @@ pub fn all() -> Vec<poise::Command<Data, Error>> {
         airing::airing(),
         random::random(),
         compare::compare(),
+        schedule::schedule(),
+        settings::settings(),
     ]
 }

@@ -4,7 +4,8 @@ use serde_json::json;
 use crate::models::responses::{
     AniListApiError, AniListErrorResponse, AniListUser, Character, CharacterData,
     FavouritesData, GraphQlResponse, Media, MediaRecommendationInfo, MediaSearchData,
-    RecommendationData, Staff, StaffData, Studio, StudioData, UserData, UserFavourites,
+    RecommendationData, Staff, StaffBirthday, StaffBirthdayData, StaffData, Studio, StudioData,
+    UserData, UserFavourites,
 };
 use super::queries;
 use super::cache::{Cache, RateLimiter};
@@ -395,4 +396,22 @@ pub async fn fetch_favourites(
         graphql_post(client, rate_limiter, queries::FAVOURITES_QUERY, vars).await?;
     cache.set(key, &data.user).await;
     Ok(data.user)
+}
+
+/// Fetch staff members with birthdays today.
+pub async fn fetch_staff_birthdays(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+) -> Result<Vec<StaffBirthday>, Error> {
+    let key = "staff:birthdays:today".to_string();
+    if let Some(cached) = cache.get::<Vec<StaffBirthday>>(&key).await {
+        return Ok(cached);
+    }
+    let data: StaffBirthdayData =
+        graphql_post(client, rate_limiter, queries::STAFF_BIRTHDAY_QUERY, json!({})).await?;
+    let results = data.page.staff;
+    // Cache for 1 hour
+    cache.set_with_ttl(key, &results, 3600).await;
+    Ok(results)
 }

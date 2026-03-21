@@ -450,6 +450,25 @@ pub struct MangaStats {
     pub mean_score: f32,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StaffBirthdayData {
+    #[serde(rename = "Page")]
+    pub page: StaffBirthdayPage,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StaffBirthdayPage {
+    pub staff: Vec<StaffBirthday>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StaffBirthday {
+    pub id: u64,
+    pub name: StaffNameFull,
+    pub image: StaffImage,
+    pub site_url: String,
+}
+
 // ─── AniList error envelope ───────────────────────────────────────────────────
 //
 // AniList returns errors as `{ "data": null, "errors": [{ "message", "status" }] }`

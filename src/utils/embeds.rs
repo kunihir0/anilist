@@ -1,7 +1,8 @@
 use poise::serenity_prelude::{self as serenity, CreateEmbed};
 
 use crate::models::responses::{
-    AniListUser, Character, Media, MediaRecommendationInfo, Staff, Studio, UserFavourites,
+    AniListUser, Character, Media, MediaRecommendationInfo, Staff, StaffBirthday, Studio,
+    UserFavourites,
 };
 
 const ANILIST_BLUE: u32 = 0x02a9ff;
@@ -229,6 +230,28 @@ pub fn staff_embed(staff: &Staff) -> CreateEmbed {
     }
     if let Some(url) = &staff.image.large {
         embed = embed.thumbnail(url);
+    }
+
+    embed
+}
+
+// ─── Staff Birthday embed ────────────────────────────────────────────────────
+
+pub fn staff_birthday_embed(staff_list: &[StaffBirthday]) -> CreateEmbed {
+    let mut embed = CreateEmbed::new()
+        .title("🎂 Today's Staff Birthdays")
+        .colour(serenity::Colour::new(PURPLE))
+        .footer(serenity::CreateEmbedFooter::new("Powered by AniList"));
+
+    if staff_list.is_empty() {
+        embed = embed.description("No staff birthdays found for today.");
+    } else {
+        let list: String = staff_list.iter()
+            .take(15)
+            .map(|s| format!("[{}]({})", s.name.preferred(), s.site_url))
+            .collect::<Vec<_>>()
+            .join("\n");
+        embed = embed.description(list);
     }
 
     embed

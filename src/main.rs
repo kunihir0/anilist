@@ -3,19 +3,23 @@ mod commands;
 mod models;
 mod tasks;
 mod utils;
+mod store;
 
 use models::bot_data::Data;
 use api::cache::{Cache, RateLimiter};
 use poise::serenity_prelude as serenity;
 use reqwest::Client;
 use tracing::error;
+use std::sync::Arc;
+use store::Store;
+use tokio_cron_scheduler::JobScheduler;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "anilist_bot=info,poise=warn".into()),
+                .unwrap_or_else(|_| "anilist=info,poise=warn".into()),
         )
         .init();
 
@@ -28,6 +32,9 @@ async fn main() {
         .ok()
         .and_then(|id| id.parse::<u64>().ok())
         .map(serenity::GuildId::new);
+
+    let store = Arc::new(Store::new("store.json".into()).await.expect("Failed to initialize store"));
+    let scheduler = JobScheduler::new().await.expect("Failed to create scheduler");
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -71,9 +78,8 @@ async fn main() {
 
                 let cmd_names: Vec<String> = framework.options().commands.iter().map(|c| c.name.to_string()).collect();
                 utils::startup::print_banner(&ready.user.name, ready.guilds.len(), &cmd_names);
-                tasks::presence::spawn(ctx.clone());
-
-                Ok(Data {
+                
+                let data = Arc::new(Data {
                     http_client: Client::builder()
                         .timeout(std::time::Duration::from_secs(10))
                         .build()
@@ -82,7 +88,14 @@ async fn main() {
                     cache: Cache::new(300),
                     // AniList allows 90 requests per 60-second window.
                     rate_limiter: RateLimiter::new(90, 60),
-                })
+                    store: store.clone(),
+                    scheduler: scheduler.clone(),
+                });
+
+                tasks::presence::spawn(ctx.clone());
+                tasks::scheduler::spawn_scheduler(ctx.clone(), data.clone()).await;
+
+                Ok((*data).clone())
             })
         })
         .build();

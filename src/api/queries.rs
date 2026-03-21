@@ -164,6 +164,20 @@ query ($name: String) {
 }
 "#;
 
+/// Get staff members with birthdays today.
+pub const STAFF_BIRTHDAY_QUERY: &str = r#"
+query {
+  Page(perPage: 50) {
+    staff(isBirthday: true) {
+      id
+      name { full native }
+      image { large }
+      site_url: siteUrl
+    }
+  }
+}
+"#;
+
 /// Upcoming anime for a given season and year.
 pub const UPCOMING_QUERY: &str = r#"
 query ($season: MediaSeason, $seasonYear: Int) {
