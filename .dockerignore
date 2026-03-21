@@ -1,0 +1,14 @@
+# Build artifacts — never send to Docker daemon
+target/
+
+# Git history
+.git/
+.gitignore
+
+# Local environment files — secrets go in at runtime via -e or --env-file
+.env
+.env.example
+Secrets.toml
+
+# Docs and meta
+README.md

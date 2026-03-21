@@ -2,6 +2,9 @@
   <img src="assets/logo.png" alt="Anilist Logo" width="150" />
   <h1>Anilist</h1>
   <p><strong>A Discord bot for querying AniList. Built with Rust, Poise, and Serenity.</strong></p>
+  <a href="https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=2147483648">
+    <img src="https://img.shields.io/badge/Add%20to%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Add to Discord" />
+  </a>
 </div>
 
 ## Commands
@@ -14,7 +17,11 @@
 
 ## Setup
 
-**Prerequisites:** Rust toolchain, a Discord bot token, a bot application with `applications.commands` scope.
+**Prerequisites:** A Discord bot token and a bot application with `applications.commands` scope.
+
+### Local
+
+Requires the Rust toolchain.
 
 1. Clone the repo and copy the env file:
    ```
@@ -30,6 +37,23 @@
 3. Run:
    ```
    cargo run
+   ```
+
+### Docker
+
+1. Build the image:
+   ```
+   docker build -t anilist .
+   ```
+
+2. Run:
+   ```
+   docker run -d \
+     -e DISCORD_TOKEN=your_token_here \
+     -e GUILD_ID=your_guild_id_here \
+     --name anilist \
+     --restart unless-stopped \
+     anilist
    ```
 
 `GUILD_ID` registers commands instantly to one guild — useful for development. Without it, commands register globally and take up to one hour to propagate.
