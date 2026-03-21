@@ -2,7 +2,7 @@
   <img src="assets/logo.png" alt="Anilist Logo" width="150" />
   <h1>Anilist</h1>
   <p><strong>A Discord bot for querying AniList. Built with Rust, Poise, and Serenity.</strong></p>
-  <a href="https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=2147483648">
+  <a href="https://discord.com/oauth2/authorize?client_id=1484531884628246569&scope=bot+applications.commands&permissions=2147483648">
     <img src="https://img.shields.io/badge/Add%20to%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Add to Discord" />
   </a>
 </div>
