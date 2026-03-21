@@ -7,13 +7,32 @@
   </a>
 </div>
 
+&nbsp;
+
+[![CI](https://github.com/kunihir0/anilist/actions/workflows/ci.yml/badge.svg)](https://github.com/kunihir0/anilist/actions/workflows/ci.yml)
+[![Docker](https://github.com/kunihir0/anilist/actions/workflows/docker.yml/badge.svg)](https://github.com/kunihir0/anilist/actions/workflows/docker.yml)
+
 ## Commands
 
 | Command | Description |
 |---|---|
-| `/anime <title>` | Search for an anime by title |
-| `/manga <title>` | Search for a manga by title |
-| `/profile <username>` | Look up an AniList user profile |
+| `/anime <title>` | Search for an anime by title — paginated, up to 5 results |
+| `/manga <title>` | Search for a manga by title — paginated, up to 5 results |
+| `/character <name>` | Look up a character and their media appearances |
+| `/staff <name>` | Look up a voice actor, director, or composer |
+| `/studio <name>` | Look up a studio and their notable works |
+| `/profile <username>` | Look up an AniList user profile and stats |
+| `/compare <user1> <user2>` | Compare two AniList profiles side by side |
+| `/favourites <username>` | Show a user's public AniList favourites |
+| `/watchlist <username>` | Browse a user's anime or manga list by status |
+| `/recommendations <title>` | Get community recommendations for a title |
+| `/relations <title>` | Show sequels, prequels, and related entries |
+| `/trending` | Top trending anime or manga right now |
+| `/upcoming` | Seasonal anime chart — defaults to current season |
+| `/airing` | Currently airing anime with episode countdowns |
+| `/random` | Get a random well-rated anime or manga |
+| `/genre <genre>` | Browse top titles by genre |
+| `/filter` | Advanced search by format, status, year, country, and more |
 
 ## Setup
 
@@ -41,34 +60,42 @@ Requires the Rust toolchain.
 
 ### Docker
 
-1. Build the image:
-   ```
-   docker build -t anilist .
-   ```
+**From GitHub Container Registry (recommended):**
 
-2. Run:
-   ```
-   docker run -d \
-     -e DISCORD_TOKEN=your_token_here \
-     -e GUILD_ID=your_guild_id_here \
-     --name anilist \
-     --restart unless-stopped \
-     anilist
-   ```
+```
+docker run -d \
+  -e DISCORD_TOKEN=your_token_here \
+  -e GUILD_ID=your_guild_id_here \
+  --name anilist \
+  --restart unless-stopped \
+  ghcr.io/kunihir0/anilist:main
+```
+
+**Build locally:**
+
+```
+docker build -t anilist .
+
+docker run -d \
+  -e DISCORD_TOKEN=your_token_here \
+  -e GUILD_ID=your_guild_id_here \
+  --name anilist \
+  --restart unless-stopped \
+  anilist
+```
 
 `GUILD_ID` registers commands instantly to one guild — useful for development. Without it, commands register globally and take up to one hour to propagate.
 
-## Project Structure
+### Railway
 
-```
-src/
-  main.rs              # Framework bootstrap
-  commands/            # Slash command handlers
-  api/                 # AniList GraphQL requests and query strings
-  models/              # Serde structs and Poise type aliases
-  tasks/               # Background tasks (rotating presence)
-  utils/               # Embed builders and startup banner
-```
+1. Create a new service and select **Deploy a Docker Image**
+2. Enter the image path: `ghcr.io/kunihir0/anilist:main`
+3. Add environment variables in the **Variables** tab:
+   ```
+   DISCORD_TOKEN=your_token_here
+   GUILD_ID=your_guild_id_here
+   ```
+4. Disable the public URL under **Settings → Networking** — the bot makes outbound connections only
 
 ## Dependencies
 
@@ -77,3 +104,5 @@ src/
 - [reqwest](https://github.com/seanmonstar/reqwest) — HTTP client
 - [tokio](https://tokio.rs) — async runtime
 - [serde](https://serde.rs) — JSON deserialization
+- [chrono](https://github.com/chronotope/chrono) — date and time
+- [futures](https://github.com/rust-lang/futures-rs) — async pagination stream
