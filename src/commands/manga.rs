@@ -1,32 +1,39 @@
 use poise::CreateReply;
-
 use crate::{
     api::anilist::fetch_manga,
     models::bot_data::{Context, Error},
-    utils::embeds::{error_embed, media_embed},
+    utils::{
+        embeds::media_embed,
+        errors::{not_found_embed, reply_error},
+        pagination::paginate,
+    },
 };
 
-/// Search AniList for a manga by title and display a rich info card.
+/// Search AniList for a manga by title.
 #[poise::command(slash_command, prefix_command)]
 pub async fn manga(
     ctx: Context<'_>,
     #[description = "Manga title to search for"] title: String,
 ) -> Result<(), Error> {
     ctx.defer().await?;
+    let data = ctx.data();
 
-    match fetch_manga(&ctx.data().http_client, &title).await {
-        Ok(media) => {
-            let embed = media_embed(&media, "Manga");
-            ctx.send(CreateReply::default().embed(embed)).await?;
+    match fetch_manga(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
+        Ok(results) if results.is_empty() => {
+            ctx.send(
+                CreateReply::default()
+                    .embed(not_found_embed("Manga", &title))
+                    .ephemeral(true),
+            )
+            .await?;
+        }
+        Ok(results) => {
+            let pages: Vec<_> = results.iter().map(|m| media_embed(m, "Manga")).collect();
+            paginate(ctx, pages).await?;
         }
         Err(e) => {
-            tracing::warn!("AniList manga fetch failed for {:?}: {e}", title);
-            let embed = error_embed(
-                "Manga Not Found",
-                &format!("Could not find a manga matching **{title}**.\nDouble-check the spelling or try a different title."),
-            );
-            ctx.send(CreateReply::default().embed(embed).ephemeral(true))
-                .await?;
+            tracing::warn!("Manga fetch failed for {title:?}: {e}");
+            reply_error(ctx, &e).await?;
         }
     }
 

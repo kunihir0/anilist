@@ -9,10 +9,10 @@ path = "src/main.rs"
 
 [dependencies]
 # Poise wraps Serenity and provides the slash-command macro layer
-poise = "0.6"
+poise = "0.6.1"
 
 # Serenity — underlying Discord library exposed through poise::serenity_prelude
-serenity = { version = "0.12", default-features = false, features = [
+serenity = { version = "0.12.5", default-features = false, features = [
     "client",
     "gateway",
     "rustls_backend",
@@ -20,18 +20,22 @@ serenity = { version = "0.12", default-features = false, features = [
 ] }
 
 # Async runtime
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.50.0", features = ["macros", "rt-multi-thread"] }
 
 # Long-lived HTTP client for GraphQL requests stored in Data
 reqwest = { version = "0.13.2", features = ["json"] }
 
 # JSON ↔ Rust struct mapping
-serde      = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde      = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+# Async stream utilities for pagination
+futures    = "0.3.32"
+chrono     = "0.4.44"
 
 # .env loader
-dotenvy = "0.15"
+dotenvy = "0.15.7"
 
 # Structured logging (used by poise::builtins::on_error)
-tracing            = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing            = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

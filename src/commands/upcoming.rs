@@ -1,0 +1,70 @@
+use chrono::{Datelike, Utc};
+use poise::CreateReply;
+use crate::{
+    api::anilist::fetch_upcoming,
+    models::bot_data::{Context, Error},
+    utils::{
+        embeds::upcoming_page_embed,
+        errors::{not_found_embed, reply_error},
+        pagination::paginate,
+    },
+};
+
+fn current_season() -> &'static str {
+    match Utc::now().month() {
+        3..=5  => "SPRING",
+        6..=8  => "SUMMER",
+        9..=11 => "FALL",
+        _      => "WINTER",
+    }
+}
+
+/// Show the upcoming anime chart for the current (or a specified) season.
+#[poise::command(slash_command, prefix_command)]
+pub async fn upcoming(
+    ctx: Context<'_>,
+    #[description = "Season: WINTER, SPRING, SUMMER, FALL (defaults to current)"]
+    season: Option<String>,
+    #[description = "Year (defaults to current year)"]
+    year: Option<i32>,
+) -> Result<(), Error> {
+    ctx.defer().await?;
+    let data = ctx.data();
+
+    let season_str = season
+        .map(|s| s.to_uppercase())
+        .unwrap_or_else(|| current_season().to_string());
+
+    let year_val = year.unwrap_or_else(|| Utc::now().year());
+
+    match fetch_upcoming(
+        &data.http_client, &data.cache, &data.rate_limiter, &season_str, year_val,
+    ).await {
+        Ok(shows) if shows.is_empty() => {
+            ctx.send(
+                CreateReply::default()
+                    .embed(not_found_embed("Upcoming Anime", &format!("{season_str} {year_val}")))
+                    .ephemeral(true),
+            )
+            .await?;
+        }
+        Ok(shows) => {
+            let chunks: Vec<_> = shows.chunks(5).collect();
+            let total_pages = chunks.len();
+            let pages: Vec<_> = chunks
+                .iter()
+                .enumerate()
+                .map(|(i, chunk)| {
+                    upcoming_page_embed(chunk, &season_str, year_val, i + 1, total_pages)
+                })
+                .collect();
+            paginate(ctx, pages).await?;
+        }
+        Err(e) => {
+            tracing::warn!("Upcoming fetch failed: {e}");
+            reply_error(ctx, &e).await?;
+        }
+    }
+
+    Ok(())
+}

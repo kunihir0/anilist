@@ -1,72 +1,303 @@
 use reqwest::Client;
 use serde_json::json;
 
-use crate::models::responses::{GraphQlResponse, Media, MediaData, AniListUser, UserData};
+use crate::models::responses::{
+    AniListApiError, AniListErrorResponse, AniListUser, Character, CharacterData,
+    GraphQlResponse, Media, MediaSearchData, Studio, StudioData, UserData,
+};
 use super::queries;
+use super::cache::{Cache, RateLimiter};
 
 const ANILIST_URL: &str = "https://graphql.anilist.co";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+type Error = Box<dyn std::error::Error + Send + Sync>;
 
-/// Fire a POST to the AniList GraphQL endpoint with the given query + variables,
-/// then deserialise the response into `T`.
-///
-/// This is the single place that touches the network — every public function
-/// below delegates here.
+// ─── Core HTTP helper ─────────────────────────────────────────────────────────
+
+/// A typed error that carries both a user-facing message and an optional
+/// HTTP/GraphQL status code for richer error embeds.
+#[derive(Debug)]
+pub struct AniListError {
+    pub message: String,
+    pub status: Option<u16>,
+    pub kind: AniListErrorKind,
+}
+
+#[derive(Debug)]
+pub enum AniListErrorKind {
+    NotFound,
+    RateLimit,
+    ApiError,
+    Network,
+    Decode,
+}
+
+impl std::fmt::Display for AniListError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for AniListError {}
+
+impl From<AniListApiError> for AniListError {
+    fn from(e: AniListApiError) -> Self {
+        let kind = match e.status {
+            Some(404) => AniListErrorKind::NotFound,
+            Some(429) => AniListErrorKind::RateLimit,
+            _         => AniListErrorKind::ApiError,
+        };
+        AniListError { message: e.message, status: e.status, kind }
+    }
+}
+
 async fn graphql_post<T>(
     client: &Client,
+    rate_limiter: &RateLimiter,
     query: &str,
     variables: serde_json::Value,
-) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
+) -> Result<T, Error>
 where
     T: serde::de::DeserializeOwned,
 {
+    rate_limiter.check().await?;
+
     let body = json!({ "query": query, "variables": variables });
 
-    let response = client
+    let resp = client
         .post(ANILIST_URL)
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .json(&body)
         .send()
-        .await?;
+        .await
+        .map_err(|e| AniListError {
+            message: format!("Network error: {e}"),
+            status: e.status().map(|s| s.as_u16()),
+            kind: AniListErrorKind::Network,
+        })?;
 
-    // Surface HTTP-level errors before attempting to deserialise.
-    let response = response.error_for_status()?;
+    // Surface HTTP-level errors (4xx / 5xx) before attempting to deserialise.
+    let status_code = resp.status().as_u16();
+    let resp = resp.error_for_status().map_err(|e| AniListError {
+        message: format!("HTTP {status_code}: {e}"),
+        status: Some(status_code),
+        kind: if status_code == 429 {
+            AniListErrorKind::RateLimit
+        } else {
+            AniListErrorKind::ApiError
+        },
+    })?;
 
-    let parsed: GraphQlResponse<T> = response.json().await?;
+    // Read the body once so we can inspect it for both data and errors.
+    let bytes = resp.bytes().await.map_err(|e| AniListError {
+        message: format!("Failed to read response body: {e}"),
+        status: None,
+        kind: AniListErrorKind::Network,
+    })?;
+
+    // Check for GraphQL-level errors first (`{ "data": null, "errors": [...] }`).
+    if let Ok(err_resp) = serde_json::from_slice::<AniListErrorResponse>(&bytes) {
+        if let Some(first) = err_resp.errors.into_iter().next() {
+            return Err(Box::new(AniListError::from(first)));
+        }
+    }
+
+    // Deserialise the happy-path response.
+    let parsed: GraphQlResponse<T> = serde_json::from_slice(&bytes).map_err(|e| AniListError {
+        message: format!("Unexpected response format: {e}"),
+        status: None,
+        kind: AniListErrorKind::Decode,
+    })?;
+
     Ok(parsed.data)
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/// Search AniList for an anime by title.
-/// Returns the best-matching `Media` struct or an error.
+/// Search anime by title — returns up to 5 results.
 pub async fn fetch_anime(
     client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
     search: &str,
-) -> Result<Media, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<Media>, Error> {
+    let key = format!("anime:{search}");
+    if let Some(cached) = cache.get::<Vec<Media>>(&key).await {
+        return Ok(cached);
+    }
     let vars = json!({ "search": search });
-    let data: MediaData = graphql_post(client, queries::ANIME_QUERY, vars).await?;
-    Ok(data.media)
+    let data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::ANIME_SEARCH_QUERY, vars).await?;
+    let results = data.page.media;
+    cache.set(key, &results).await;
+    Ok(results)
 }
 
-/// Search AniList for a manga by title.
+/// Search manga by title — returns up to 5 results.
 pub async fn fetch_manga(
     client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
     search: &str,
-) -> Result<Media, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<Media>, Error> {
+    let key = format!("manga:{search}");
+    if let Some(cached) = cache.get::<Vec<Media>>(&key).await {
+        return Ok(cached);
+    }
     let vars = json!({ "search": search });
-    let data: MediaData = graphql_post(client, queries::MANGA_QUERY, vars).await?;
-    Ok(data.media)
+    let data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::MANGA_SEARCH_QUERY, vars).await?;
+    let results = data.page.media;
+    cache.set(key, &results).await;
+    Ok(results)
 }
 
-/// Fetch a public AniList user profile by username.
+/// Fetch a character by name.
+pub async fn fetch_character(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    search: &str,
+) -> Result<Character, Error> {
+    let key = format!("character:{search}");
+    if let Some(cached) = cache.get::<Character>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "search": search });
+    let data: CharacterData =
+        graphql_post(client, rate_limiter, queries::CHARACTER_QUERY, vars).await?;
+    cache.set(key, &data.character).await;
+    Ok(data.character)
+}
+
+/// Fetch a studio by name.
+pub async fn fetch_studio(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    search: &str,
+) -> Result<Studio, Error> {
+    let key = format!("studio:{search}");
+    if let Some(cached) = cache.get::<Studio>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "search": search });
+    let data: StudioData =
+        graphql_post(client, rate_limiter, queries::STUDIO_QUERY, vars).await?;
+    cache.set(key, &data.studio).await;
+    Ok(data.studio)
+}
+
+/// Fetch upcoming anime for a given season + year.
+pub async fn fetch_upcoming(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    season: &str,
+    year: i32,
+) -> Result<Vec<Media>, Error> {
+    let key = format!("upcoming:{season}:{year}");
+    if let Some(cached) = cache.get::<Vec<Media>>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "season": season, "seasonYear": year });
+    let data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::UPCOMING_QUERY, vars).await?;
+    let results = data.page.media;
+    cache.set(key, &results).await;
+    Ok(results)
+}
+
+/// Fetch currently airing anime with next-episode countdowns.
+pub async fn fetch_airing(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+) -> Result<Vec<Media>, Error> {
+    let key = "airing:current".to_string();
+    // Short TTL for airing data — we still respect the cache set by the
+    // caller (2 min TTL in Data::new for airing vs 5 min for everything else).
+    if let Some(cached) = cache.get::<Vec<Media>>(&key).await {
+        return Ok(cached);
+    }
+    let data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::AIRING_QUERY, json!({})).await?;
+    let results = data.page.media;
+    cache.set(key, &results).await;
+    Ok(results)
+}
+
+/// Fetch a random anime or manga ("ANIME" | "MANGA").
+///
+/// AniList does not support `sort: RANDOM` and `lastPage` from pageInfo is
+/// documented as inaccurate. Instead we pick a random page from a fixed pool
+/// of 100 (perPage: 1, popularity-sorted) and fall back to page 1 if the
+/// chosen page returns nothing.
+pub async fn fetch_random(
+    client: &Client,
+    rate_limiter: &RateLimiter,
+    media_type: &str,
+) -> Result<Media, Error> {
+    let page = rand_page(100);
+    let vars = json!({ "type": media_type, "page": page });
+
+    let data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::RANDOM_PAGE_QUERY, vars).await?;
+
+    // If the chosen page is beyond the actual pool, fall back to page 1.
+    if let Some(media) = data.page.media.into_iter().next() {
+        return Ok(media);
+    }
+
+    let fallback = json!({ "type": media_type, "page": 1 });
+    let fallback_data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::RANDOM_PAGE_QUERY, fallback).await?;
+
+    fallback_data
+        .page
+        .media
+        .into_iter()
+        .next()
+        .ok_or_else(|| "No results returned for random query.".into())
+}
+
+/// Pseudo-random page in [1, max] — no extra crate.
+///
+/// Mixes full seconds and nanoseconds so repeated calls within the same
+/// second produce different values. Uses a Xorshift64 step to spread bits.
+fn rand_page(max: u32) -> u32 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let dur = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+
+    // Combine whole seconds and nanoseconds into one 64-bit seed.
+    let mut x: u64 = (dur.as_secs().wrapping_mul(1_000_000_007))
+        ^ (dur.subsec_nanos() as u64);
+
+    // One round of Xorshift64 to spread bits across the full range.
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+
+    ((x % max as u64) as u32).max(1)
+}
+
+/// Fetch an AniList user profile.
 pub async fn fetch_user(
     client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
     username: &str,
-) -> Result<AniListUser, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<AniListUser, Error> {
+    let key = format!("user:{username}");
+    if let Some(cached) = cache.get::<AniListUser>(&key).await {
+        return Ok(cached);
+    }
     let vars = json!({ "name": username });
-    let data: UserData = graphql_post(client, queries::USER_QUERY, vars).await?;
+    let data: UserData =
+        graphql_post(client, rate_limiter, queries::USER_QUERY, vars).await?;
+    cache.set(key, &data.user).await;
     Ok(data.user)
 }

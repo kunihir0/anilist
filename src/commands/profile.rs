@@ -1,9 +1,11 @@
 use poise::CreateReply;
-
 use crate::{
     api::anilist::fetch_user,
     models::bot_data::{Context, Error},
-    utils::embeds::{error_embed, user_embed},
+    utils::{
+        embeds::user_embed,
+        errors::reply_error,
+    },
 };
 
 /// Look up a public AniList user profile and display their stats.
@@ -13,20 +15,15 @@ pub async fn profile(
     #[description = "AniList username to look up"] username: String,
 ) -> Result<(), Error> {
     ctx.defer().await?;
+    let data = ctx.data();
 
-    match fetch_user(&ctx.data().http_client, &username).await {
+    match fetch_user(&data.http_client, &data.cache, &data.rate_limiter, &username).await {
         Ok(user) => {
-            let embed = user_embed(&user);
-            ctx.send(CreateReply::default().embed(embed)).await?;
+            ctx.send(CreateReply::default().embed(user_embed(&user))).await?;
         }
         Err(e) => {
-            tracing::warn!("AniList user fetch failed for {:?}: {e}", username);
-            let embed = error_embed(
-                "User Not Found",
-                &format!("Could not find an AniList profile for **{username}**.\nMake sure the username is spelled correctly and the profile is public."),
-            );
-            ctx.send(CreateReply::default().embed(embed).ephemeral(true))
-                .await?;
+            tracing::warn!("User fetch failed for {username:?}: {e}");
+            reply_error(ctx, &e).await?;
         }
     }
 
