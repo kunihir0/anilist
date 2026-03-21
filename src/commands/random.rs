@@ -16,12 +16,13 @@ pub async fn random(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     let kind = media_type.unwrap_or(MediaType::Anime);
 
     match fetch_random(&data.http_client, &data.rate_limiter, kind.as_str()).await {
         Ok(media) => {
-            ctx.send(CreateReply::default().embed(media_embed(&media, kind.name()))).await?;
+            ctx.send(CreateReply::default().embed(media_embed(&media, kind.name(), prefs.title_language))).await?;
         }
         Err(e) => {
             tracing::warn!("Random fetch failed: {e}");

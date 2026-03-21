@@ -8,7 +8,7 @@ use crate::{
     },
 };
 
-/// Look up an anime studio and display their notable works.
+/// Search AniList for a studio by name.
 #[poise::command(slash_command, prefix_command)]
 pub async fn studio(
     ctx: Context<'_>,
@@ -16,10 +16,11 @@ pub async fn studio(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     match fetch_studio(&data.http_client, &data.cache, &data.rate_limiter, &name).await {
         Ok(studio) => {
-            ctx.send(CreateReply::default().embed(studio_embed(&studio))).await?;
+            ctx.send(CreateReply::default().embed(studio_embed(&studio, prefs.title_language))).await?;
         }
         Err(e) => {
             tracing::warn!("Studio fetch failed for {name:?}: {e}");

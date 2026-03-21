@@ -16,10 +16,11 @@ pub async fn recommendations(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     match fetch_recommendations(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
         Ok(recommendations) => {
-            ctx.send(CreateReply::default().embed(recommendations_embed(&recommendations))).await?;
+            ctx.send(CreateReply::default().embed(recommendations_embed(&recommendations, prefs.title_language))).await?;
         }
         Err(e) => {
             tracing::warn!("Recommendations fetch failed for {title:?}: {e}");

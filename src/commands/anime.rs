@@ -1,10 +1,10 @@
-use poise::CreateReply;
+use poise::{ChoiceParameter, CreateReply};
 use crate::{
     api::anilist::fetch_anime,
     models::bot_data::{Context, Error},
     utils::{
         embeds::media_embed,
-        errors::{not_found_embed, reply_error},
+        errors::reply_error,
         pagination::paginate,
     },
 };
@@ -17,18 +17,17 @@ pub async fn anime(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     match fetch_anime(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
         Ok(results) if results.is_empty() => {
-            ctx.send(
-                CreateReply::default()
-                    .embed(not_found_embed("Anime", &title))
-                    .ephemeral(true),
-            )
-            .await?;
+            ctx.say(format!("No anime found for `{title}`.")).await?;
         }
         Ok(results) => {
-            let pages: Vec<_> = results.iter().map(|m| media_embed(m, "Anime")).collect();
+            let pages: Vec<_> = results
+                .iter()
+                .map(|m| media_embed(m, "Anime", prefs.title_language.clone()))
+                .collect();
             paginate(ctx, pages).await?;
         }
         Err(e) => {

@@ -2,16 +2,17 @@ use poise::serenity_prelude::{self as serenity, CreateEmbed};
 
 use crate::models::responses::{
     AniListUser, Character, Media, MediaRecommendationInfo, Staff, StaffBirthday, Studio,
-    UserFavourites,
+    UserFavourites, MediaListCollection,
 };
+use crate::store::TitleLanguage;
 
 const ANILIST_BLUE: u32 = 0x02a9ff;
 const PURPLE:       u32 = 0x9b59b6;
 const TEAL:         u32 = 0x1abc9c;
 
-// ─── Media (anime / manga / upcoming / random) ────────────────────────────────
+// ─── Media (anime / manga / upcoming / random / filter) ────────────────────────
 
-pub fn media_embed(media: &Media, media_type: &str) -> CreateEmbed {
+pub fn media_embed(media: &Media, media_type: &str, lang: Option<TitleLanguage>) -> CreateEmbed {
     let description = media
         .description.as_deref()
         .map(clean_html)
@@ -27,7 +28,7 @@ pub fn media_embed(media: &Media, media_type: &str) -> CreateEmbed {
     let score  = media.average_score.map(|s| format!("{s}/100")).unwrap_or_else(|| "N/A".to_string());
     let status = media.status.as_deref().unwrap_or("Unknown");
     let format = media.format.as_deref().unwrap_or("Unknown");
-    let title  = media.title.preferred();
+    let title  = media.title.get_title(lang);
 
     let mut embed = CreateEmbed::new()
         .title(title)
@@ -64,16 +65,14 @@ pub fn media_embed(media: &Media, media_type: &str) -> CreateEmbed {
 
 // ─── Airing embed (single show, for airing list page) ────────────────────────
 
-/// Build one embed representing a page of currently-airing shows.
-/// Each show becomes an inline field: "Ep X — in Yd Zh".
-pub fn airing_page_embed(shows: &[Media], page: usize, total_pages: usize) -> CreateEmbed {
+pub fn airing_page_embed(shows: &[Media], page: usize, total_pages: usize, lang: Option<TitleLanguage>) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title("Currently Airing")
         .colour(serenity::Colour::new(TEAL))
         .footer(serenity::CreateEmbedFooter::new(format!("Page {page} of {total_pages}")));
 
     for show in shows {
-        let title = show.title.preferred();
+        let title = show.title.get_title(lang.clone());
         let value = match &show.next_airing_episode {
             Some(ep) => format!("Ep {} — in {}", ep.episode, ep.countdown()),
             None => "Airing".to_string(),
@@ -86,13 +85,13 @@ pub fn airing_page_embed(shows: &[Media], page: usize, total_pages: usize) -> Cr
 
 // ─── Upcoming embed ───────────────────────────────────────────────────────────
 
-/// Build one embed for a page of upcoming seasonal shows.
 pub fn upcoming_page_embed(
     shows: &[Media],
     season: &str,
     year: i32,
     page: usize,
     total_pages: usize,
+    lang: Option<TitleLanguage>,
 ) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title(format!("Upcoming — {season} {year}"))
@@ -100,7 +99,7 @@ pub fn upcoming_page_embed(
         .footer(serenity::CreateEmbedFooter::new(format!("Page {page} of {total_pages}")));
 
     for show in shows {
-        let title = show.title.preferred();
+        let title = show.title.get_title(lang.clone());
         let start = show.start_date.as_ref().map(|d| d.display()).unwrap_or_else(|| "TBA".to_string());
         let score = show.average_score.map(|s| format!(" • {s}/100")).unwrap_or_default();
         embed = embed.field(title, format!("Starts {start}{score}"), true);
@@ -111,7 +110,7 @@ pub fn upcoming_page_embed(
 
 // ─── Character embed ──────────────────────────────────────────────────────────
 
-pub fn character_embed(character: &Character) -> CreateEmbed {
+pub fn character_embed(character: &Character, lang: Option<TitleLanguage>) -> CreateEmbed {
     let description = character
         .description.as_deref()
         .map(clean_html)
@@ -126,7 +125,7 @@ pub fn character_embed(character: &Character) -> CreateEmbed {
         .edges
         .iter()
         .map(|e| {
-            let title = e.node.title.preferred();
+            let title = e.node.title.get_title(lang.clone());
             let kind  = e.node.media_type.as_deref().unwrap_or("?");
             let mut s = format!("[{title}]({}) `{kind}`", e.node.site_url);
             if let Some(va) = e.voice_actors.first() {
@@ -158,7 +157,7 @@ pub fn character_embed(character: &Character) -> CreateEmbed {
 
 // ─── Studio embed ─────────────────────────────────────────────────────────────
 
-pub fn studio_embed(studio: &Studio) -> CreateEmbed {
+pub fn studio_embed(studio: &Studio, lang: Option<TitleLanguage>) -> CreateEmbed {
     let kind = if studio.is_animation_studio {
         "Animation Studio"
     } else {
@@ -171,7 +170,7 @@ pub fn studio_embed(studio: &Studio) -> CreateEmbed {
         .iter()
         .enumerate()
         .map(|(i, n)| {
-            let title  = n.title.preferred();
+            let title  = n.title.get_title(lang.clone());
             let year   = n.season_year.map(|y| format!(" ({y})")).unwrap_or_default();
             let score  = n.average_score.map(|s| format!(" • {s}/100")).unwrap_or_default();
             let format = n.format.as_deref().unwrap_or("?");
@@ -195,7 +194,7 @@ pub fn studio_embed(studio: &Studio) -> CreateEmbed {
 
 // ─── Staff embed ─────────────────────────────────────────────────────────────
 
-pub fn staff_embed(staff: &Staff) -> CreateEmbed {
+pub fn staff_embed(staff: &Staff, lang: Option<TitleLanguage>) -> CreateEmbed {
     let description = staff
         .description.as_deref()
         .map(clean_html)
@@ -211,7 +210,7 @@ pub fn staff_embed(staff: &Staff) -> CreateEmbed {
         .nodes
         .iter()
         .map(|n| {
-            let title = n.title.preferred();
+            let title = n.title.get_title(lang.clone());
             let kind  = n.media_type.as_deref().unwrap_or("?");
             format!("[{title}]({}) `{kind}`", n.site_url)
         })
@@ -259,14 +258,14 @@ pub fn staff_birthday_embed(staff_list: &[StaffBirthday]) -> CreateEmbed {
 
 // ─── Recommendations embed ───────────────────────────────────────────────────
 
-pub fn recommendations_embed(media: &MediaRecommendationInfo) -> CreateEmbed {
-    let title = media.title.preferred();
+pub fn recommendations_embed(media: &MediaRecommendationInfo, lang: Option<TitleLanguage>) -> CreateEmbed {
+    let title = media.title.get_title(lang.clone());
     let recs: String = media
         .recommendations
         .nodes
         .iter()
         .filter_map(|n| n.media_recommendation.as_ref())
-        .map(|r| format!("[{}]({})", r.title.preferred(), r.site_url))
+        .map(|r| format!("[{}]({})", r.title.get_title(lang.clone()), r.site_url))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -277,15 +276,43 @@ pub fn recommendations_embed(media: &MediaRecommendationInfo) -> CreateEmbed {
         .colour(serenity::Colour::new(ANILIST_BLUE))
 }
 
-// ─── Media list embed (trending / genre) ─────────────────────────────────────
+// ─── Relations embed ─────────────────────────────────────────────────────────
 
-pub fn media_list_embed(media: &[Media], title: &str) -> CreateEmbed {
+pub fn relations_embed(media: &Media, lang: Option<TitleLanguage>) -> CreateEmbed {
+    let title = media.title.get_title(lang.clone());
+    let mut embed = CreateEmbed::new()
+        .title(format!("Relations for {title}"))
+        .url(&media.site_url)
+        .colour(serenity::Colour::new(ANILIST_BLUE));
+
+    if let Some(relations) = &media.relations {
+        let list: String = relations.edges.iter()
+            .map(|e| {
+                let r_type = e.relation_type.replace('_', " ");
+                let r_title = e.node.title.get_title(lang.clone());
+                let r_format = e.node.format.as_deref().unwrap_or("?");
+                format!("`{r_type}`: [{r_title}]({}) ({r_format})", e.node.site_url)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        
+        embed = embed.description(if list.is_empty() { "No relations found.".to_string() } else { list });
+    } else {
+        embed = embed.description("No relations found.");
+    }
+
+    embed
+}
+
+// ─── Media list embed (trending / genre / filter) ─────────────────────────────────────
+
+pub fn media_list_embed(media: &[Media], title: &str, lang: Option<TitleLanguage>) -> CreateEmbed {
     let list: String = media
         .iter()
         .enumerate()
         .map(|(i, m)| {
             let score = m.average_score.map(|s| format!(" • {s}/100")).unwrap_or_default();
-            format!("{}. [{}]({}){}", i + 1, m.title.preferred(), m.site_url, score)
+            format!("{}. [{}]({}){}", i + 1, m.title.get_title(lang.clone()), m.site_url, score)
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -296,22 +323,47 @@ pub fn media_list_embed(media: &[Media], title: &str) -> CreateEmbed {
         .colour(serenity::Colour::new(ANILIST_BLUE))
 }
 
+// ─── Watchlist embed ─────────────────────────────────────────────────────────
+
+pub fn watchlist_embed(collection: &MediaListCollection, username: &str, media_type: &str, lang: Option<TitleLanguage>) -> CreateEmbed {
+    let mut embed = CreateEmbed::new()
+        .title(format!("{}'s {} Watchlist", username, media_type))
+        .colour(serenity::Colour::new(ANILIST_BLUE));
+
+    for list in &collection.lists {
+        if list.entries.is_empty() { continue; }
+        
+        let entries: String = list.entries.iter().take(10)
+            .map(|e| {
+                let title = e.media.title.get_title(lang.clone());
+                let score = if e.score > 0.0 { format!(" ({}/100)", e.score) } else { "".to_string() };
+                format!("[{}]({}){}", title, e.media.site_url, score)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        
+        embed = embed.field(&list.name, entries, false);
+    }
+
+    embed
+}
+
 // ─── Favourites embed ────────────────────────────────────────────────────────
 
-pub fn favourites_embed(user: &UserFavourites) -> CreateEmbed {
+pub fn favourites_embed(user: &UserFavourites, lang: Option<TitleLanguage>) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title(format!("{}'s Favourites", user.name))
         .url(&user.site_url)
         .colour(serenity::Colour::new(ANILIST_BLUE));
 
     let anime: String = user.favourites.anime.nodes.iter()
-        .map(|n| format!("[{}]({})", n.title.preferred(), n.site_url))
+        .map(|n| format!("[{}]({})", n.title.get_title(lang.clone()), n.site_url))
         .collect::<Vec<_>>()
         .join("\n");
     if !anime.is_empty() { embed = embed.field("Anime", anime, true); }
 
     let manga: String = user.favourites.manga.nodes.iter()
-        .map(|n| format!("[{}]({})", n.title.preferred(), n.site_url))
+        .map(|n| format!("[{}]({})", n.title.get_title(lang.clone()), n.site_url))
         .collect::<Vec<_>>()
         .join("\n");
     if !manga.is_empty() { embed = embed.field("Manga", manga, true); }

@@ -22,10 +22,11 @@ pub async fn search(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     match fetch_staff(&data.http_client, &data.cache, &data.rate_limiter, &name).await {
         Ok(staff) => {
-            ctx.send(CreateReply::default().embed(staff_embed(&staff))).await?;
+            ctx.send(CreateReply::default().embed(staff_embed(&staff, prefs.title_language))).await?;
         }
         Err(e) => {
             tracing::warn!("Staff fetch failed for {name:?}: {e}");

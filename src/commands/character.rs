@@ -16,10 +16,11 @@ pub async fn character(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     match fetch_character(&data.http_client, &data.cache, &data.rate_limiter, &name).await {
         Ok(character) => {
-            ctx.send(CreateReply::default().embed(character_embed(&character))).await?;
+            ctx.send(CreateReply::default().embed(character_embed(&character, prefs.title_language))).await?;
         }
         Err(e) => {
             tracing::warn!("Character fetch failed for {name:?}: {e}");

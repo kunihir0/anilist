@@ -16,10 +16,11 @@ pub async fn favourites(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     match fetch_favourites(&data.http_client, &data.cache, &data.rate_limiter, &username).await {
         Ok(user) => {
-            ctx.send(CreateReply::default().embed(favourites_embed(&user))).await?;
+            ctx.send(CreateReply::default().embed(favourites_embed(&user, prefs.title_language))).await?;
         }
         Err(e) => {
             tracing::warn!("Favourites fetch failed for {username:?}: {e}");

@@ -9,10 +9,11 @@ use models::bot_data::Data;
 use api::cache::{Cache, RateLimiter};
 use poise::serenity_prelude as serenity;
 use reqwest::Client;
-use tracing::error;
+use tracing::{error, info};
 use std::sync::Arc;
 use store::Store;
 use tokio_cron_scheduler::JobScheduler;
+use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() {
@@ -35,6 +36,7 @@ async fn main() {
 
     let store = Arc::new(Store::new("store.json".into()).await.expect("Failed to initialize store"));
     let scheduler = JobScheduler::new().await.expect("Failed to create scheduler");
+    let genres_cache = Arc::new(RwLock::new(Vec::new()));
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -62,6 +64,7 @@ async fn main() {
             ..Default::default()
         })
         .setup(move |ctx, ready, framework| {
+            let genres_cache = genres_cache.clone();
             Box::pin(async move {
                 match guild_id {
                     Some(gid) => {
@@ -79,28 +82,44 @@ async fn main() {
                 let cmd_names: Vec<String> = framework.options().commands.iter().map(|c| c.name.to_string()).collect();
                 utils::startup::print_banner(&ready.user.name, ready.guilds.len(), &cmd_names);
                 
-                let data = Arc::new(Data {
-                    http_client: Client::builder()
-                        .timeout(std::time::Duration::from_secs(10))
-                        .build()
-                        .expect("Failed to build reqwest client"),
-                    // Cache entries expire after 5 minutes.
-                    cache: Cache::new(300),
-                    // AniList allows 90 requests per 60-second window.
-                    rate_limiter: RateLimiter::new(90, 60),
+                let client = Client::builder()
+                    .timeout(std::time::Duration::from_secs(10))
+                    .build()
+                    .expect("Failed to build reqwest client");
+                
+                let cache = Cache::new(300);
+                let rate_limiter = RateLimiter::new(90, 60);
+
+                // Pre-fetch genres for autocomplete
+                match api::anilist::fetch_genres(&client, &cache, &rate_limiter).await {
+                    Ok(genres) => {
+                        info!("Cached {} genres for autocomplete.", genres.len());
+                        let mut g_lock = genres_cache.write().await;
+                        *g_lock = genres;
+                    }
+                    Err(e) => {
+                        error!("Failed to pre-fetch genres: {}", e);
+                    }
+                }
+
+                let data = Data {
+                    http_client: client,
+                    cache,
+                    rate_limiter,
                     store: store.clone(),
                     scheduler: scheduler.clone(),
-                });
+                    genres: genres_cache,
+                };
 
                 tasks::presence::spawn(ctx.clone());
-                tasks::scheduler::spawn_scheduler(ctx.clone(), data.clone()).await;
+                tasks::scheduler::spawn_scheduler(ctx.clone(), Arc::new(data.clone())).await;
 
-                Ok((*data).clone())
+                Ok(data)
             })
         })
         .build();
 
-    let intents = serenity::GatewayIntents::non_privileged();
+    let intents = serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
 
     let mut client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)

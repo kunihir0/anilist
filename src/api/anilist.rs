@@ -3,9 +3,9 @@ use serde_json::json;
 
 use crate::models::responses::{
     AniListApiError, AniListErrorResponse, AniListUser, Character, CharacterData,
-    FavouritesData, GraphQlResponse, Media, MediaRecommendationInfo, MediaSearchData,
-    RecommendationData, Staff, StaffBirthday, StaffBirthdayData, StaffData, Studio, StudioData,
-    UserData, UserFavourites,
+    FavouritesData, GenreCollectionData, GraphQlResponse, Media, MediaListCollectionData,
+    MediaRecommendationInfo, MediaSearchData, RecommendationData, Staff, StaffBirthday,
+    StaffBirthdayData, StaffData, Studio, StudioData, UserData, UserFavourites, MediaListCollection,
 };
 use super::queries;
 use super::cache::{Cache, RateLimiter};
@@ -134,6 +134,25 @@ pub async fn fetch_anime(
     let results = data.page.media;
     cache.set(key, &results).await;
     Ok(results)
+}
+
+/// Search a single media by title.
+pub async fn fetch_media_by_title(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    search: &str,
+) -> Result<Media, Error> {
+    let key = format!("media:title:{search}");
+    if let Some(cached) = cache.get::<Media>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "search": search });
+    let data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::ANIME_SEARCH_QUERY, vars).await?;
+    let media = data.page.media.into_iter().next().ok_or("Media not found")?;
+    cache.set(key, &media).await;
+    Ok(media)
 }
 
 /// Search manga by title — returns up to 5 results.
@@ -392,10 +411,10 @@ pub async fn fetch_favourites(
         return Ok(cached);
     }
     let vars = json!({ "name": username });
-    let data: FavouritesData =
+    let data: UserFavourites =
         graphql_post(client, rate_limiter, queries::FAVOURITES_QUERY, vars).await?;
-    cache.set(key, &data.user).await;
-    Ok(data.user)
+    cache.set(key, &data).await;
+    Ok(data)
 }
 
 /// Fetch staff members with birthdays today.
@@ -414,4 +433,67 @@ pub async fn fetch_staff_birthdays(
     // Cache for 1 hour
     cache.set_with_ttl(key, &results, 3600).await;
     Ok(results)
+}
+
+/// Fetch a user's media list collection.
+pub async fn fetch_watchlist(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    username: &str,
+    media_type: &str,
+) -> Result<MediaListCollection, Error> {
+    let key = format!("watchlist:{username}:{media_type}");
+    if let Some(cached) = cache.get::<MediaListCollection>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "name": username, "type": media_type });
+    let data: MediaListCollectionData =
+        graphql_post(client, rate_limiter, queries::MEDIA_LIST_QUERY, vars).await?;
+    cache.set(key, &data.collection).await;
+    Ok(data.collection)
+}
+
+/// Fetch all available genres from AniList.
+pub async fn fetch_genres(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+) -> Result<Vec<String>, Error> {
+    let key = "genres:collection".to_string();
+    if let Some(cached) = cache.get::<Vec<String>>(&key).await {
+        return Ok(cached);
+    }
+    let data: GenreCollectionData =
+        graphql_post(client, rate_limiter, queries::GENRE_COLLECTION_QUERY, json!({})).await?;
+    cache.set_with_ttl(key, &data.genres, 86400).await; // Cache for 24h
+    Ok(data.genres)
+}
+
+/// Fetch filtered media.
+pub async fn fetch_filtered_media(
+    client: &Client,
+    _cache: &Cache,
+    rate_limiter: &RateLimiter,
+    media_type: Option<&str>,
+    format: Option<Vec<&str>>,
+    status: Option<&str>,
+    country: Option<&str>,
+    genres: Option<Vec<&str>>,
+    year: Option<i32>,
+    sort: Option<Vec<&str>>,
+) -> Result<Vec<Media>, Error> {
+    let vars = json!({
+        "type": media_type,
+        "format": format,
+        "status": status,
+        "country": country,
+        "genres": genres,
+        "year": year,
+        "sort": sort,
+    });
+    // We don't cache this due to the high number of parameter combinations.
+    let data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::FILTER_QUERY, vars).await?;
+    Ok(data.page.media)
 }

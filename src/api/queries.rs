@@ -16,6 +16,18 @@ query ($search: String) {
       coverImage { large }
       siteUrl
       startDate { year month day }
+      relations {
+        edges {
+          relationType
+          node {
+            id
+            title { romaji english }
+            format
+            status
+            siteUrl
+          }
+        }
+      }
     }
   }
 }
@@ -34,6 +46,80 @@ query ($search: String) {
       coverImage { large }
       siteUrl
       startDate { year month day }
+      relations {
+        edges {
+          relationType
+          node {
+            id
+            title { romaji english }
+            format
+            status
+            siteUrl
+          }
+        }
+      }
+    }
+  }
+}
+"#;
+
+/// Get a user's media list collection.
+pub const MEDIA_LIST_QUERY: &str = r#"
+query ($name: String, $type: MediaType) {
+  MediaListCollection(userName: $name, type: $type) {
+    lists {
+      name
+      entries {
+        status
+        score(format: POINT_100)
+        progress
+        media {
+          id
+          title { romaji english }
+          siteUrl
+        }
+      }
+    }
+  }
+}
+"#;
+
+/// Get all valid genres.
+pub const GENRE_COLLECTION_QUERY: &str = r#"
+query {
+  GenreCollection
+}
+"#;
+
+/// Advanced filter query.
+pub const FILTER_QUERY: &str = r#"
+query (
+  $page: Int = 1,
+  $type: MediaType,
+  $format: [MediaFormat],
+  $status: MediaStatus,
+  $country: CountryCode,
+  $genres: [String],
+  $year: Int,
+  $sort: [MediaSort] = [POPULARITY_DESC]
+) {
+  Page(page: $page, perPage: 10) {
+    pageInfo { total currentPage lastPage hasNextPage }
+    media(
+      type: $type,
+      format_in: $format,
+      status: $status,
+      countryOfOrigin: $country,
+      genre_in: $genres,
+      seasonYear: $year,
+      sort: $sort
+    ) {
+      id
+      title { romaji english }
+      format
+      status
+      averageScore
+      siteUrl
     }
   }
 }

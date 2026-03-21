@@ -4,35 +4,34 @@ use crate::{
     models::bot_data::{Context, Error},
     utils::{
         embeds::airing_page_embed,
-        errors::{not_found_embed, reply_error},
+        errors::reply_error,
         pagination::paginate,
     },
 };
 
-/// Show currently airing anime with episode countdown timers.
+/// Show currently airing anime with episode countdowns.
 #[poise::command(slash_command, prefix_command)]
 pub async fn airing(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     match fetch_airing(&data.http_client, &data.cache, &data.rate_limiter).await {
         Ok(shows) if shows.is_empty() => {
-            ctx.send(
-                CreateReply::default()
-                    .embed(not_found_embed("Airing Anime", "currently"))
-                    .ephemeral(true),
-            )
-            .await?;
+            ctx.say("No currently airing anime found.").await?;
         }
         Ok(shows) => {
-            // 5 shows per page — inline fields look cramped beyond that
+            // Group shows into chunks of 5 for pagination
             let chunks: Vec<_> = shows.chunks(5).collect();
             let total_pages = chunks.len();
             let pages: Vec<_> = chunks
                 .iter()
                 .enumerate()
-                .map(|(i, chunk)| airing_page_embed(chunk, i + 1, total_pages))
+                .map(|(i, chunk)| {
+                    airing_page_embed(chunk, i + 1, total_pages, prefs.title_language.clone())
+                })
                 .collect();
+
             paginate(ctx, pages).await?;
         }
         Err(e) => {

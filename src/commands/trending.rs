@@ -17,13 +17,14 @@ pub async fn trending(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     let kind = media_type.unwrap_or(MediaType::Anime);
 
     match fetch_trending(&data.http_client, &data.cache, &data.rate_limiter, kind.as_str()).await {
         Ok(media) => {
             let title = format!("Trending {}", kind.name());
-            ctx.send(CreateReply::default().embed(media_list_embed(&media, &title))).await?;
+            ctx.send(CreateReply::default().embed(media_list_embed(&media, &title, prefs.title_language))).await?;
         }
         Err(e) => {
             tracing::warn!("Trending fetch failed: {e}");

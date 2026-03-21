@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::store::TitleLanguage;
 
 // ─── GraphQL envelope ────────────────────────────────────────────────────────
 
@@ -23,6 +24,27 @@ impl MediaTitle {
             .or(self.romaji.as_deref())
             .or(self.native.as_deref())
             .unwrap_or("Unknown Title")
+    }
+
+    pub fn get_title(&self, lang: Option<TitleLanguage>) -> &str {
+        match lang {
+            Some(TitleLanguage::Romaji) => self.romaji(),
+            Some(TitleLanguage::English) => self.english(),
+            Some(TitleLanguage::Native) => self.native(),
+            None => self.preferred(),
+        }
+    }
+
+    pub fn romaji(&self) -> &str {
+        self.romaji.as_deref().unwrap_or("Unknown Title")
+    }
+
+    pub fn english(&self) -> &str {
+        self.english.as_deref().unwrap_or("Unknown Title")
+    }
+
+    pub fn native(&self) -> &str {
+        self.native.as_deref().unwrap_or("Unknown Title")
     }
 }
 
@@ -84,6 +106,32 @@ pub struct Media {
     // Airing-only (None for non-airing queries)
     #[serde(rename = "nextAiringEpisode")]
     pub next_airing_episode: Option<NextAiringEpisode>,
+
+    // Relations (None for queries that don't fetch them)
+    #[serde(default)]
+    pub relations: Option<MediaRelations>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaRelations {
+    pub edges: Vec<MediaRelationEdge>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaRelationEdge {
+    #[serde(rename = "relationType")]
+    pub relation_type: String,
+    pub node: MediaRelationNode,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaRelationNode {
+    pub id: u64,
+    pub title: MediaTitle,
+    pub format: Option<String>,
+    pub status: Option<String>,
+    #[serde(rename = "siteUrl")]
+    pub site_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -449,6 +497,51 @@ pub struct MangaStats {
     #[serde(rename = "meanScore")]
     pub mean_score: f32,
 }
+
+// ─── Media List Collection ───────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MediaListCollectionData {
+    #[serde(rename = "MediaListCollection")]
+    pub collection: MediaListCollection,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MediaListCollection {
+    pub lists: Vec<MediaList>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MediaList {
+    pub name: String,
+    pub entries: Vec<MediaListEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MediaListEntry {
+    pub status: String,
+    pub score: f32,
+    pub progress: u32,
+    pub media: MediaListNode,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MediaListNode {
+    pub id: u64,
+    pub title: MediaTitle,
+    #[serde(rename = "siteUrl")]
+    pub site_url: String,
+}
+
+// ─── Genre Collection ────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GenreCollectionData {
+    #[serde(rename = "GenreCollection")]
+    pub genres: Vec<String>,
+}
+
+// ─── Staff Birthday ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StaffBirthdayData {

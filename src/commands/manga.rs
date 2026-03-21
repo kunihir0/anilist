@@ -4,7 +4,7 @@ use crate::{
     models::bot_data::{Context, Error},
     utils::{
         embeds::media_embed,
-        errors::{not_found_embed, reply_error},
+        errors::reply_error,
         pagination::paginate,
     },
 };
@@ -17,18 +17,17 @@ pub async fn manga(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
 
     match fetch_manga(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
         Ok(results) if results.is_empty() => {
-            ctx.send(
-                CreateReply::default()
-                    .embed(not_found_embed("Manga", &title))
-                    .ephemeral(true),
-            )
-            .await?;
+            ctx.say(format!("No manga found for `{title}`.")).await?;
         }
         Ok(results) => {
-            let pages: Vec<_> = results.iter().map(|m| media_embed(m, "Manga")).collect();
+            let pages: Vec<_> = results
+                .iter()
+                .map(|m| media_embed(m, "Manga", prefs.title_language.clone()))
+                .collect();
             paginate(ctx, pages).await?;
         }
         Err(e) => {

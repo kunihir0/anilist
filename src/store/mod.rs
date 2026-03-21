@@ -6,6 +6,29 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GuildSettings {
     pub mod_role_id: Option<u64>,
+    pub watch_party: Option<WatchParty>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WatchParty {
+    pub media_id: u64,
+    pub title: String,
+    pub channel_id: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UserPrefs {
+    pub title_language: Option<TitleLanguage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, poise::ChoiceParameter, PartialEq, Eq)]
+pub enum TitleLanguage {
+    #[name = "Romaji"]
+    Romaji,
+    #[name = "English"]
+    English,
+    #[name = "Native"]
+    Native,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -52,6 +75,7 @@ pub struct ScheduleEntry {
 pub struct PersistentData {
     pub settings: HashMap<u64, GuildSettings>,
     pub schedules: HashMap<u64, Vec<ScheduleEntry>>,
+    pub user_prefs: HashMap<u64, UserPrefs>,
 }
 
 pub struct Store {
@@ -91,6 +115,15 @@ impl Store {
     pub async fn get_settings(&self, guild_id: u64) -> GuildSettings {
         let data = self.data.read().await;
         data.settings.get(&guild_id).cloned().unwrap_or_default()
+    }
+
+    pub async fn set_watch_party(&self, guild_id: u64, party: WatchParty) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        {
+            let mut data = self.data.write().await;
+            let entry = data.settings.entry(guild_id).or_insert_with(GuildSettings::default);
+            entry.watch_party = Some(party);
+        }
+        self.save().await
     }
 
     pub async fn add_schedule(&self, entry: ScheduleEntry) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -147,6 +180,20 @@ impl Store {
     pub async fn get_all_schedules(&self) -> HashMap<u64, Vec<ScheduleEntry>> {
         let data = self.data.read().await;
         data.schedules.clone()
+    }
+
+    pub async fn get_user_prefs(&self, user_id: u64) -> UserPrefs {
+        let data = self.data.read().await;
+        data.user_prefs.get(&user_id).cloned().unwrap_or_default()
+    }
+
+    pub async fn set_title_language(&self, user_id: u64, lang: TitleLanguage) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        {
+            let mut data = self.data.write().await;
+            let prefs = data.user_prefs.entry(user_id).or_insert_with(UserPrefs::default);
+            prefs.title_language = Some(lang);
+        }
+        self.save().await
     }
 
     async fn save(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

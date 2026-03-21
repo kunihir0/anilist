@@ -66,22 +66,22 @@ async fn execute_job(
     match entry.content_type {
         ContentType::DailyAnime => {
             let media = fetch_random(&data.http_client, &data.rate_limiter, "ANIME").await?;
-            let embed = media_embed(&media, "Anime");
+            let embed = media_embed(&media, "Anime", None);
             channel_id.send_message(&http, serenity::CreateMessage::new().embed(embed)).await?;
         }
         ContentType::DailyManga => {
             let media = fetch_random(&data.http_client, &data.rate_limiter, "MANGA").await?;
-            let embed = media_embed(&media, "Manga");
+            let embed = media_embed(&media, "Manga", None);
             channel_id.send_message(&http, serenity::CreateMessage::new().embed(embed)).await?;
         }
         ContentType::AiringUpdate => {
             let shows = fetch_airing(&data.http_client, &data.cache, &data.rate_limiter).await?;
-            let embed = airing_page_embed(&shows, 1, 1);
+            let embed = airing_page_embed(&shows, 1, 1, None);
             channel_id.send_message(&http, serenity::CreateMessage::new().embed(embed)).await?;
         }
         ContentType::Trending => {
             let media = fetch_trending(&data.http_client, &data.cache, &data.rate_limiter, "ANIME").await?;
-            let embed = media_list_embed(&media, "Trending Anime");
+            let embed = media_list_embed(&media, "Trending Anime", None);
             channel_id.send_message(&http, serenity::CreateMessage::new().embed(embed)).await?;
         }
         ContentType::NewSeason => {
@@ -94,7 +94,7 @@ async fn execute_job(
             };
             let year = Utc::now().year();
             let shows = fetch_upcoming(&data.http_client, &data.cache, &data.rate_limiter, season, year).await?;
-            let embed = upcoming_page_embed(&shows, season, year, 1, 1);
+            let embed = upcoming_page_embed(&shows, season, year, 1, 1, None);
             channel_id.send_message(&http, serenity::CreateMessage::new().embed(embed)).await?;
         }
         ContentType::StaffBirthday => {
