@@ -1,12 +1,12 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::{fetch_staff, fetch_staff_birthdays},
     models::bot_data::{Context, Error},
     utils::{
-        embeds::{staff_embed, staff_birthday_embed},
+        embeds::{staff_birthday_embed, staff_embed},
         errors::reply_error,
     },
 };
+use poise::CreateReply;
 
 /// Search AniList for a staff member (VA, director, etc) by name.
 #[poise::command(slash_command, prefix_command, subcommands("search", "today"))]
@@ -32,7 +32,12 @@ pub async fn search(
 
     match fetch_staff(&data.http_client, &data.cache, &data.rate_limiter, &name).await {
         Ok(staff) => {
-            ctx.send(CreateReply::default().embed(staff_embed(&staff, prefs.title_language, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(staff_embed(
+                &staff,
+                prefs.title_language,
+                accent_color,
+            )))
+            .await?;
         }
         Err(e) => {
             tracing::warn!("Staff fetch failed for {name:?}: {e}");
@@ -57,7 +62,8 @@ pub async fn today(ctx: Context<'_>) -> Result<(), Error> {
 
     match fetch_staff_birthdays(&data.http_client, &data.cache, &data.rate_limiter).await {
         Ok(staff) => {
-            ctx.send(CreateReply::default().embed(staff_birthday_embed(&staff, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(staff_birthday_embed(&staff, accent_color)))
+                .await?;
         }
         Err(e) => {
             tracing::warn!("Staff birthdays fetch failed: {e}");

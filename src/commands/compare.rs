@@ -1,12 +1,9 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_user,
     models::bot_data::{Context, Error},
-    utils::{
-        embeds::compare_embed,
-        errors::reply_error,
-    },
+    utils::{embeds::compare_embed, errors::reply_error},
 };
+use poise::CreateReply;
 
 /// Compare two AniList user profiles side by side.
 #[poise::command(slash_command, prefix_command)]
@@ -29,7 +26,8 @@ pub async fn compare(
 
     match tokio::try_join!(u1_task, u2_task) {
         Ok((u1, u2)) => {
-            ctx.send(CreateReply::default().embed(compare_embed(&u1, &u2, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(compare_embed(&u1, &u2, accent_color)))
+                .await?;
         }
         Err(e) => {
             tracing::warn!("Comparison fetch failed: {e}");

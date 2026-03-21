@@ -1,12 +1,9 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_recommendations,
     models::bot_data::{Context, Error},
-    utils::{
-        embeds::recommendations_embed,
-        errors::reply_error,
-    },
+    utils::{embeds::recommendations_embed, errors::reply_error},
 };
+use poise::CreateReply;
 
 /// Get top recommendations for a media title.
 #[poise::command(slash_command, prefix_command)]
@@ -26,7 +23,12 @@ pub async fn recommendations(
 
     match fetch_recommendations(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
         Ok(recommendations) => {
-            ctx.send(CreateReply::default().embed(recommendations_embed(&recommendations, prefs.title_language, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(recommendations_embed(
+                &recommendations,
+                prefs.title_language,
+                accent_color,
+            )))
+            .await?;
         }
         Err(e) => {
             tracing::warn!("Recommendations fetch failed for {title:?}: {e}");

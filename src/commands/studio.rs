@@ -1,12 +1,9 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_studio,
     models::bot_data::{Context, Error},
-    utils::{
-        embeds::studio_embed,
-        errors::reply_error,
-    },
+    utils::{embeds::studio_embed, errors::reply_error},
 };
+use poise::CreateReply;
 
 /// Search AniList for a studio by name.
 #[poise::command(slash_command, prefix_command)]
@@ -26,7 +23,12 @@ pub async fn studio(
 
     match fetch_studio(&data.http_client, &data.cache, &data.rate_limiter, &name).await {
         Ok(studio) => {
-            ctx.send(CreateReply::default().embed(studio_embed(&studio, prefs.title_language, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(studio_embed(
+                &studio,
+                prefs.title_language,
+                accent_color,
+            )))
+            .await?;
         }
         Err(e) => {
             tracing::warn!("Studio fetch failed for {name:?}: {e}");

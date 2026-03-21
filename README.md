@@ -31,8 +31,18 @@
 | `/upcoming` | Seasonal anime chart — defaults to current season |
 | `/airing` | Currently airing anime with episode countdowns |
 | `/random` | Get a random well-rated anime or manga |
-| `/genre <genre>` | Browse top titles by genre |
+| `/genre <genre>` | Browse top titles by genre (with autocomplete) |
 | `/filter` | Advanced search by format, status, year, country, and more |
+| `/quiz` | Play a quick anime guessing quiz |
+| `/watch <set|next|vote>` | Manage a channel's watch party series |
+| `/serverlist <add|list|watched>` | Manage a shared server anime list |
+| `/schedule <add|list|pause|remove>` | Set up automated daily/weekly AniList posts |
+| `/settings <mod_role|color|list>` | Configure guild settings and embed themes |
+| `/leaderboard` | View the server's `/quiz` leaderboard |
+| `/recommend compare <u1> <u2>` | Find shows one user has seen that the other hasn't |
+| `/prefs title_language` | Set your preferred title language (Romaji/English/Native) |
+| `/ping` | Check bot latency and API response time |
+| `/help` | List all available commands |
 
 ## Setup
 
@@ -51,6 +61,7 @@ Requires the Rust toolchain.
    ```
    DISCORD_TOKEN=your_token_here
    GUILD_ID=your_guild_id_here   # optional, remove for global registration
+   DATABASE_URL=sqlite:anilist.db?mode=rwc # optional, defaults to this
    ```
 
 3. Run:
@@ -65,11 +76,12 @@ Requires the Rust toolchain.
 ```
 docker run -d \
   -e DISCORD_TOKEN=your_token_here \
-  -e GUILD_ID=your_guild_id_here \
+  -v ./data:/app \
   --name anilist \
   --restart unless-stopped \
   ghcr.io/kunihir0/anilist:main
 ```
+*(Note: A volume mount `/app` is recommended to persist `anilist.db` across container restarts).*
 
 **Build locally:**
 
@@ -106,3 +118,5 @@ docker run -d \
 - [serde](https://serde.rs) — JSON deserialization
 - [chrono](https://github.com/chronotope/chrono) — date and time
 - [futures](https://github.com/rust-lang/futures-rs) — async pagination stream
+- [sqlx](https://github.com/launchbadge/sqlx) — async SQL database toolkit
+- [moka](https://github.com/moka-rs/moka) — high performance caching

@@ -1,20 +1,15 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_filtered_media,
-    models::bot_data::{Context, Error, MediaType, MediaFormat, MediaStatus, MediaSort},
-    utils::{
-        embeds::media_list_embed,
-        errors::reply_error,
-    },
+    models::bot_data::{Context, Error, MediaFormat, MediaSort, MediaStatus, MediaType},
+    utils::{embeds::media_list_embed, errors::reply_error},
 };
+use poise::CreateReply;
 
-async fn autocomplete_genre(
-    ctx: Context<'_>,
-    partial: &str,
-) -> impl Iterator<Item = String> {
+async fn autocomplete_genre(ctx: Context<'_>, partial: &str) -> impl Iterator<Item = String> {
     let genres = ctx.data().genres.read().await;
     let partial = partial.to_lowercase();
-    genres.iter()
+    genres
+        .iter()
         .filter(move |g| g.to_lowercase().contains(&partial))
         .cloned()
         .collect::<Vec<_>>()
@@ -28,7 +23,9 @@ pub async fn filter(
     #[description = "Media type (ANIME or MANGA)"] media_type: Option<MediaType>,
     #[description = "Media format (TV, Movie, etc.)"] format: Option<MediaFormat>,
     #[description = "Media status (Finished, Releasing, etc.)"] status: Option<MediaStatus>,
-    #[description = "Genre to filter by"] #[autocomplete = "autocomplete_genre"] genre: Option<String>,
+    #[description = "Genre to filter by"]
+    #[autocomplete = "autocomplete_genre"]
+    genre: Option<String>,
     #[description = "Release year"] year: Option<i32>,
     #[description = "Sort order"] sort: Option<MediaSort>,
 ) -> Result<(), Error> {
@@ -46,7 +43,7 @@ pub async fn filter(
     let format_str = format.map(|f| f.as_str());
     let format_vec = format_str.as_ref().map(|s| vec![*s]);
     let status_str = status.map(|s| s.as_str());
-    
+
     let genres_vec = genre.as_deref().map(|g| vec![g]);
     let sort_str = sort.map(|s| s.as_str());
     let sort_vec = sort_str.as_ref().map(|s| vec![*s]);
@@ -61,10 +58,18 @@ pub async fn filter(
         None, // country
         genres_vec,
         year,
-        sort_vec
-    ).await {
+        sort_vec,
+    )
+    .await
+    {
         Ok(media) => {
-            ctx.send(CreateReply::default().embed(media_list_embed(&media, "Search Results", prefs.title_language, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(media_list_embed(
+                &media,
+                "Search Results",
+                prefs.title_language,
+                accent_color,
+            )))
+            .await?;
         }
         Err(e) => {
             tracing::warn!("Filter fetch failed: {e}");

@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use futures::StreamExt;
-use poise::serenity_prelude::{
-    self as serenity, ButtonStyle, CreateActionRow, CreateButton,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
-};
 use poise::CreateReply;
+use poise::serenity_prelude::{
+    self as serenity, ButtonStyle, CreateActionRow, CreateButton, CreateInteractionResponse,
+    CreateInteractionResponseMessage,
+};
 use serenity::collector::ComponentInteractionCollector;
 
 use crate::models::bot_data::{Context, Error};
@@ -89,9 +89,7 @@ pub async fn paginate(ctx: Context<'_>, pages: Vec<serenity::CreateEmbed>) -> Re
     while let Some(interaction) = stream.next().await {
         match interaction.data.custom_id.as_str() {
             "prev" => {
-                if index > 0 {
-                    index -= 1;
-                }
+                index = index.saturating_sub(1);
             }
             "next" => {
                 if index + 1 < total {

@@ -1,6 +1,6 @@
-use poise::serenity_prelude::{self as serenity, CreateEmbed};
-use crate::models::bot_data::{Context, Error, BotError};
 use crate::api::anilist::AniListError;
+use crate::models::bot_data::{BotError, Context, Error};
+use poise::serenity_prelude::{self as serenity, CreateEmbed};
 
 const RED: u32 = 0xe74c3c;
 const YELLOW: u32 = 0xf1c40f;
@@ -20,27 +20,27 @@ pub fn anilist_error_embed(err: &AniListError) -> CreateEmbed {
         AniListError::NotFound { .. } => (
             YELLOW,
             "Not Found",
-            "Try adjusting your search terms or checking the spelling."
+            "Try adjusting your search terms or checking the spelling.",
         ),
         AniListError::RateLimit => (
             ORANGE,
             "Rate Limited",
-            "AniList allows 90 requests per minute. Please wait a moment before trying again."
+            "AniList allows 90 requests per minute. Please wait a moment before trying again.",
         ),
         AniListError::Api { .. } => (
             RED,
             "AniList API Error",
-            "The AniList API returned an error. This might be a temporary issue."
+            "The AniList API returned an error. This might be a temporary issue.",
         ),
         AniListError::Network(_) => (
             RED,
             "Network Error",
-            "Failed to connect to AniList. Check your internet connection or try again later."
+            "Failed to connect to AniList. Check your internet connection or try again later.",
         ),
         AniListError::Decode(_) => (
             RED,
             "Decoding Error",
-            "Received an unexpected response format from AniList."
+            "Received an unexpected response format from AniList.",
         ),
     };
 

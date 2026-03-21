@@ -1,12 +1,9 @@
-use poise::{ChoiceParameter, CreateReply};
 use crate::{
     api::anilist::fetch_watchlist,
     models::bot_data::{Context, Error, MediaType},
-    utils::{
-        embeds::watchlist_embed,
-        errors::reply_error,
-    },
+    utils::{embeds::watchlist_embed, errors::reply_error},
 };
+use poise::{ChoiceParameter, CreateReply};
 
 /// Look up a user's media watchlist collection.
 #[poise::command(slash_command, prefix_command)]
@@ -24,12 +21,27 @@ pub async fn watchlist(
     } else {
         None
     };
-    
+
     let kind = media_type.unwrap_or(MediaType::Anime);
 
-    match fetch_watchlist(&data.http_client, &data.cache, &data.rate_limiter, &username, kind.as_str()).await {
+    match fetch_watchlist(
+        &data.http_client,
+        &data.cache,
+        &data.rate_limiter,
+        &username,
+        kind.as_str(),
+    )
+    .await
+    {
         Ok(collection) => {
-            ctx.send(CreateReply::default().embed(watchlist_embed(&collection, &username, kind.name(), prefs.title_language, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(watchlist_embed(
+                &collection,
+                &username,
+                kind.name(),
+                prefs.title_language,
+                accent_color,
+            )))
+            .await?;
         }
         Err(e) => {
             tracing::warn!("Watchlist fetch failed for {username:?}: {e}");

@@ -1,9 +1,9 @@
 // ─── ANSI colour constants ────────────────────────────────────────────────────
-const RESET:   &str = "\x1b[0m";
-const BOLD:    &str = "\x1b[1m";
-const CYAN:    &str = "\x1b[36m";
-const GREEN:   &str = "\x1b[32m";
-const YELLOW:  &str = "\x1b[33m";
+const RESET: &str = "\x1b[0m";
+const BOLD: &str = "\x1b[1m";
+const CYAN: &str = "\x1b[36m";
+const GREEN: &str = "\x1b[32m";
+const YELLOW: &str = "\x1b[33m";
 const MAGENTA: &str = "\x1b[35m";
 
 /// Prints a styled startup banner to stdout.
@@ -22,7 +22,10 @@ pub fn print_banner(bot_name: &str, guild_count: usize, commands: &[String]) {
     println!("  {GREEN}{BOLD}✔  Logged in{RESET}       {YELLOW}{bot_name}{RESET}");
     println!("  {GREEN}{BOLD}✔  Guilds{RESET}          {MAGENTA}{guild_count}{RESET}");
     println!("  {GREEN}{BOLD}✔  Presence{RESET}        rotating (10 statuses, 30s interval)");
-    println!("  {GREEN}{BOLD}✔  Commands{RESET}        ({} registered)", commands.len());
+    println!(
+        "  {GREEN}{BOLD}✔  Commands{RESET}        ({} registered)",
+        commands.len()
+    );
     for line in &cmd_lines {
         println!("             {MAGENTA}{line}{RESET}");
     }

@@ -1,12 +1,9 @@
-use poise::{ChoiceParameter, CreateReply};
 use crate::{
     api::anilist::fetch_random,
     models::bot_data::{Context, Error, MediaType},
-    utils::{
-        embeds::media_embed,
-        errors::reply_error,
-    },
+    utils::{embeds::media_embed, errors::reply_error},
 };
+use poise::{ChoiceParameter, CreateReply};
 
 /// Get a random well-rated anime or manga from AniList.
 #[poise::command(slash_command, prefix_command)]
@@ -28,7 +25,13 @@ pub async fn random(
 
     match fetch_random(&data.http_client, &data.rate_limiter, kind.as_str()).await {
         Ok(media) => {
-            ctx.send(CreateReply::default().embed(media_embed(&media, kind.name(), prefs.title_language, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(media_embed(
+                &media,
+                kind.name(),
+                prefs.title_language,
+                accent_color,
+            )))
+            .await?;
         }
         Err(e) => {
             tracing::warn!("Random fetch failed: {e}");

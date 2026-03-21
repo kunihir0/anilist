@@ -1,5 +1,3 @@
-use chrono::{Datelike, Utc};
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_upcoming,
     models::bot_data::{Context, Error},
@@ -9,6 +7,8 @@ use crate::{
         pagination::paginate,
     },
 };
+use chrono::{Datelike, Utc};
+use poise::CreateReply;
 
 /// Show upcoming anime for a given season and year.
 #[poise::command(slash_command, prefix_command)]
@@ -32,17 +32,29 @@ pub async fn upcoming(
     let year_val = year.unwrap_or(now.year());
     let season_str = season.unwrap_or_else(|| {
         match now.month() {
-            1 | 2 | 3 => "WINTER",
-            4 | 5 | 6 => "SPRING",
-            7 | 8 | 9 => "SUMMER",
+            1..=3 => "WINTER",
+            4..=6 => "SPRING",
+            7..=9 => "SUMMER",
             _ => "FALL",
         }
         .to_string()
     });
 
-    match fetch_upcoming(&data.http_client, &data.cache, &data.rate_limiter, &season_str, year_val).await {
+    match fetch_upcoming(
+        &data.http_client,
+        &data.cache,
+        &data.rate_limiter,
+        &season_str,
+        year_val,
+    )
+    .await
+    {
         Ok(results) if results.is_empty() => {
-            ctx.send(CreateReply::default().embed(not_found_embed("Upcoming", &format!("{season_str} {year_val}")))).await?;
+            ctx.send(CreateReply::default().embed(not_found_embed(
+                "Upcoming",
+                &format!("{season_str} {year_val}"),
+            )))
+            .await?;
         }
         Ok(results) => {
             let chunks: Vec<_> = results.chunks(5).collect();
@@ -51,7 +63,15 @@ pub async fn upcoming(
                 .iter()
                 .enumerate()
                 .map(|(i, chunk)| {
-                    upcoming_page_embed(chunk, &season_str, year_val, i + 1, total_pages, prefs.title_language.clone(), accent_color)
+                    upcoming_page_embed(
+                        chunk,
+                        &season_str,
+                        year_val,
+                        i + 1,
+                        total_pages,
+                        prefs.title_language.clone(),
+                        accent_color,
+                    )
                 })
                 .collect();
             paginate(ctx, pages).await?;

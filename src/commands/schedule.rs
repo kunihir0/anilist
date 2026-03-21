@@ -1,9 +1,9 @@
-use poise::serenity_prelude as serenity;
 use crate::models::bot_data::{Context, Error};
-use crate::store::{ScheduleEntry, ContentType};
+use crate::store::{ContentType, ScheduleEntry};
 use crate::tasks::scheduler::register_job;
-use std::sync::Arc;
 use crate::utils::permissions::check_admin_or_mod;
+use poise::serenity_prelude as serenity;
+use std::sync::Arc;
 
 #[derive(Debug, poise::ChoiceParameter, Clone, Copy, PartialEq, Eq)]
 pub enum ScheduleContentType {
@@ -55,13 +55,16 @@ pub async fn add(
     #[description = "Timezone (e.g. 'UTC')"] timezone: Option<String>,
 ) -> Result<(), Error> {
     if !check_admin_or_mod(ctx).await? {
-        ctx.say("You don't have permission to manage schedules.").await?;
+        ctx.say("You don't have permission to manage schedules.")
+            .await?;
         return Ok(());
     }
 
-    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?;
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command must be run in a server")?;
     let id = rand::random::<u32>().to_string(); // Simple ID generation
-    
+
     let entry = ScheduleEntry {
         id: id.clone(),
         guild_id: guild_id.get(),
@@ -75,13 +78,29 @@ pub async fn add(
     // Try to register with the live scheduler first to validate the cron string
     let data = ctx.data();
     let data_arc = Arc::new(data.clone());
-    if let Err(e) = register_job(&data.scheduler, entry.clone(), ctx.serenity_context(), &data_arc).await {
-        ctx.say(format!("Failed to add schedule: Invalid cron expression? ({})", e)).await?;
+    if let Err(e) = register_job(
+        &data.scheduler,
+        entry.clone(),
+        ctx.serenity_context(),
+        &data_arc,
+    )
+    .await
+    {
+        ctx.say(format!(
+            "Failed to add schedule: Invalid cron expression? ({})",
+            e
+        ))
+        .await?;
         return Ok(());
     }
 
     data.store.add_schedule(entry).await?;
-    ctx.say(format!("Added schedule with ID `{}` for channel <#{}>.", id, channel.id())).await?;
+    ctx.say(format!(
+        "Added schedule with ID `{}` for channel <#{}>.",
+        id,
+        channel.id()
+    ))
+    .await?;
     Ok(())
 }
 
@@ -92,15 +111,24 @@ pub async fn remove(
     #[description = "ID of the schedule to remove"] id: String,
 ) -> Result<(), Error> {
     if !check_admin_or_mod(ctx).await? {
-        ctx.say("You don't have permission to manage schedules.").await?;
+        ctx.say("You don't have permission to manage schedules.")
+            .await?;
         return Ok(());
     }
 
-    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?;
-    if ctx.data().store.remove_schedule(guild_id.get(), &id).await? {
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command must be run in a server")?;
+    if ctx
+        .data()
+        .store
+        .remove_schedule(guild_id.get(), &id)
+        .await?
+    {
         ctx.say(format!("Removed schedule `{}`.", id)).await?;
     } else {
-        ctx.say(format!("Schedule `{}` not found in this guild.", id)).await?;
+        ctx.say(format!("Schedule `{}` not found in this guild.", id))
+            .await?;
     }
     Ok(())
 }
@@ -109,11 +137,14 @@ pub async fn remove(
 #[poise::command(slash_command, prefix_command, guild_only)]
 pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
     if !check_admin_or_mod(ctx).await? {
-        ctx.say("You don't have permission to view schedules.").await?;
+        ctx.say("You don't have permission to view schedules.")
+            .await?;
         return Ok(());
     }
 
-    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?;
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command must be run in a server")?;
     let schedules = ctx.data().store.list_schedules(guild_id.get()).await;
 
     if schedules.is_empty() {
@@ -123,7 +154,11 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
 
     let mut embed = serenity::CreateEmbed::new().title("Guild Schedules");
     for s in schedules {
-        let status = if s.active { "✅ Active" } else { "⏸️ Paused" };
+        let status = if s.active {
+            "✅ Active"
+        } else {
+            "⏸️ Paused"
+        };
         let value = format!(
             "Channel: <#{}>\nContent: `{}`\nCron: `{}`\nTimezone: `{}`\nStatus: {}",
             s.channel_id, s.content_type, s.cron_expression, s.timezone, status
@@ -142,15 +177,31 @@ pub async fn pause(
     #[description = "ID of the schedule to toggle"] id: String,
 ) -> Result<(), Error> {
     if !check_admin_or_mod(ctx).await? {
-        ctx.say("You don't have permission to manage schedules.").await?;
+        ctx.say("You don't have permission to manage schedules.")
+            .await?;
         return Ok(());
     }
 
-    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?;
-    match ctx.data().store.toggle_schedule(guild_id.get(), &id).await? {
-        Some(true) => { ctx.say(format!("Schedule `{}` is now **active**.", id)).await?; },
-        Some(false) => { ctx.say(format!("Schedule `{}` is now **paused**.", id)).await?; },
-        None => { ctx.say(format!("Schedule `{}` not found.", id)).await?; },
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command must be run in a server")?;
+    match ctx
+        .data()
+        .store
+        .toggle_schedule(guild_id.get(), &id)
+        .await?
+    {
+        Some(true) => {
+            ctx.say(format!("Schedule `{}` is now **active**.", id))
+                .await?;
+        }
+        Some(false) => {
+            ctx.say(format!("Schedule `{}` is now **paused**.", id))
+                .await?;
+        }
+        None => {
+            ctx.say(format!("Schedule `{}` not found.", id)).await?;
+        }
     }
     Ok(())
 }

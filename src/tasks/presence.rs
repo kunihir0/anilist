@@ -37,10 +37,10 @@ pub fn spawn(ctx: serenity::Context) {
 
             let (kind, text) = STATUSES[index % STATUSES.len()];
             let activity = match kind {
-                "watching"   => ActivityData::watching(text),
-                "listening"  => ActivityData::listening(text),
-                "competing"  => ActivityData::competing(text),
-                _            => ActivityData::playing(text),   // "playing" + fallback
+                "watching" => ActivityData::watching(text),
+                "listening" => ActivityData::listening(text),
+                "competing" => ActivityData::competing(text),
+                _ => ActivityData::playing(text), // "playing" + fallback
             };
 
             ctx.set_presence(Some(activity), OnlineStatus::Online);

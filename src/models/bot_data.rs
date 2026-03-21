@@ -1,9 +1,9 @@
-use reqwest::Client;
 use crate::api::cache::{Cache, RateLimiter};
 use crate::store::Store;
+use reqwest::Client;
 use std::sync::Arc;
-use tokio_cron_scheduler::JobScheduler;
 use tokio::sync::RwLock;
+use tokio_cron_scheduler::JobScheduler;
 
 // ─── Shared application state ─────────────────────────────────────────────────
 
@@ -111,22 +111,22 @@ impl MediaStatus {
 #[derive(Debug, poise::ChoiceParameter, Clone, Copy, PartialEq, Eq)]
 pub enum MediaSort {
     #[name = "Popularity"]
-    PopularityDesc,
+    Popularity,
     #[name = "Score"]
-    ScoreDesc,
+    Score,
     #[name = "Trending"]
-    TrendingDesc,
+    Trending,
     #[name = "Latest"]
-    IdDesc,
+    Id,
 }
 
 impl MediaSort {
     pub fn as_str(&self) -> &'static str {
         match self {
-            MediaSort::PopularityDesc => "POPULARITY_DESC",
-            MediaSort::ScoreDesc => "SCORE_DESC",
-            MediaSort::TrendingDesc => "TRENDING_DESC",
-            MediaSort::IdDesc => "ID_DESC",
+            MediaSort::Popularity => "POPULARITY_DESC",
+            MediaSort::Score => "SCORE_DESC",
+            MediaSort::Trending => "TRENDING_DESC",
+            MediaSort::Id => "ID_DESC",
         }
     }
 }
@@ -147,6 +147,8 @@ pub enum BotError {
     Json(#[from] serde_json::Error),
     #[error("Scheduler Error: {0}")]
     Scheduler(#[from] tokio_cron_scheduler::JobSchedulerError),
+    #[error("Database Error: {0}")]
+    Database(#[from] sqlx::Error),
     #[error("Internal Error: {0}")]
     Internal(String),
 }

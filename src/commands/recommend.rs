@@ -1,9 +1,9 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_watchlist,
     models::bot_data::{Context, Error},
     utils::embeds::media_list_embed,
 };
+use poise::CreateReply;
 use std::collections::HashSet;
 
 /// Comparison-based recommendations.
@@ -30,11 +30,27 @@ pub async fn compare(
     };
 
     // Fetch both watchlists (Anime by default for now)
-    let list1 = fetch_watchlist(&data.http_client, &data.cache, &data.rate_limiter, &user1, "ANIME").await?;
-    let list2 = fetch_watchlist(&data.http_client, &data.cache, &data.rate_limiter, &user2, "ANIME").await?;
+    let list1 = fetch_watchlist(
+        &data.http_client,
+        &data.cache,
+        &data.rate_limiter,
+        &user1,
+        "ANIME",
+    )
+    .await?;
+    let list2 = fetch_watchlist(
+        &data.http_client,
+        &data.cache,
+        &data.rate_limiter,
+        &user2,
+        "ANIME",
+    )
+    .await?;
 
     // Find titles in user1's "Completed" list that aren't in user2's list at all
-    let user2_media_ids: HashSet<u64> = list2.lists.iter()
+    let user2_media_ids: HashSet<u64> = list2
+        .lists
+        .iter()
         .flat_map(|l| l.entries.iter().map(|e| e.media.id))
         .collect();
 
@@ -43,8 +59,8 @@ pub async fn compare(
         if list.name == "Completed" {
             for entry in list.entries {
                 if !user2_media_ids.contains(&entry.media.id) {
-                    // We need full Media objects for media_list_embed, 
-                    // but we only have MediaListNode. Let's build a simple Media shim or 
+                    // We need full Media objects for media_list_embed,
+                    // but we only have MediaListNode. Let's build a simple Media shim or
                     // fetch full info. For now, let's build a minimal Media object.
                     // Ideally we'd update media_list_embed to handle minimal info.
                     // Or we just display a text list.
@@ -55,13 +71,18 @@ pub async fn compare(
     }
 
     if recommendations.is_empty() {
-        ctx.say(format!("Found no completed anime from **{}** that **{}** hasn't started.", user1, user2)).await?;
+        ctx.say(format!(
+            "Found no completed anime from **{}** that **{}** hasn't started.",
+            user1, user2
+        ))
+        .await?;
         return Ok(());
     }
 
     // Convert recommendations to minimal Media objects for the embed
     use crate::models::responses::Media;
-    let media_recs: Vec<Media> = recommendations.into_iter()
+    let media_recs: Vec<Media> = recommendations
+        .into_iter()
         .take(10)
         .map(|r| Media {
             id: r.id,
@@ -85,7 +106,13 @@ pub async fn compare(
         .collect();
 
     let title = format!("Suggestions for {} from {}'s list", user2, user1);
-    ctx.send(CreateReply::default().embed(media_list_embed(&media_recs, &title, prefs.title_language, accent_color))).await?;
+    ctx.send(CreateReply::default().embed(media_list_embed(
+        &media_recs,
+        &title,
+        prefs.title_language,
+        accent_color,
+    )))
+    .await?;
 
     Ok(())
 }

@@ -1,12 +1,9 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_media_by_title,
     models::bot_data::{Context, Error},
-    utils::{
-        embeds::relations_embed,
-        errors::reply_error,
-    },
+    utils::{embeds::relations_embed, errors::reply_error},
 };
+use poise::CreateReply;
 
 /// Get relations (sequels, prequels, etc.) for a media title.
 #[poise::command(slash_command, prefix_command)]
@@ -26,7 +23,12 @@ pub async fn relations(
 
     match fetch_media_by_title(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
         Ok(media) => {
-            ctx.send(CreateReply::default().embed(relations_embed(&media, prefs.title_language, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(relations_embed(
+                &media,
+                prefs.title_language,
+                accent_color,
+            )))
+            .await?;
         }
         Err(e) => {
             tracing::warn!("Relations fetch failed for {title:?}: {e}");

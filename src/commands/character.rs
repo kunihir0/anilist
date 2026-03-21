@@ -1,12 +1,9 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_character,
     models::bot_data::{Context, Error},
-    utils::{
-        embeds::character_embed,
-        errors::reply_error,
-    },
+    utils::{embeds::character_embed, errors::reply_error},
 };
+use poise::CreateReply;
 
 /// Search AniList for a character by name.
 #[poise::command(slash_command, prefix_command)]
@@ -26,7 +23,12 @@ pub async fn character(
 
     match fetch_character(&data.http_client, &data.cache, &data.rate_limiter, &name).await {
         Ok(character) => {
-            ctx.send(CreateReply::default().embed(character_embed(&character, prefs.title_language, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(character_embed(
+                &character,
+                prefs.title_language,
+                accent_color,
+            )))
+            .await?;
         }
         Err(e) => {
             tracing::warn!("Character fetch failed for {name:?}: {e}");

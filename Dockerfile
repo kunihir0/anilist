@@ -25,6 +25,7 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs && \
 # Now copy real source and do the final build.
 # `touch` forces Cargo to recognise the source as newer than the cached stub.
 COPY src ./src
+COPY migrations ./migrations
 RUN touch src/main.rs && cargo build --release
 
 # =============================================================================
@@ -42,7 +43,15 @@ RUN apk add --no-cache ca-certificates libgcc
 RUN adduser --disabled-password --gecos "" --no-create-home botuser
 USER botuser
 
-# Copy only the compiled binary from the builder stage
-COPY --from=builder /app/target/release/anilist /usr/local/bin/anilist
+WORKDIR /app
 
-ENTRYPOINT ["/usr/local/bin/anilist"]
+# The database file needs to be written here, so the user needs ownership
+ENV DATABASE_URL="sqlite:///app/anilist.db?mode=rwc"
+
+# Copy migrations folder for sqlx::migrate! at runtime
+COPY --from=builder /app/migrations ./migrations
+
+# Copy only the compiled binary from the builder stage
+COPY --from=builder /app/target/release/anilist ./anilist
+
+ENTRYPOINT ["./anilist"]

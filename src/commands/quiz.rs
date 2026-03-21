@@ -1,38 +1,50 @@
-use poise::serenity_prelude as serenity;
 use crate::{
     api::anilist::fetch_random,
     models::bot_data::{Context, Error},
 };
 use futures::StreamExt;
+use poise::serenity_prelude as serenity;
 
 /// Play a quick anime guessing quiz.
 #[poise::command(slash_command, prefix_command, guild_only)]
 pub async fn quiz(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();
-    let guild_id = ctx.guild_id().ok_or("This command must be run in a server")?.get();
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command must be run in a server")?
+        .get();
     let settings = data.store.get_settings(guild_id).await;
     let accent_color = settings.accent_color;
 
     // Fetch a random anime for the quiz
     let media = fetch_random(&data.http_client, &data.rate_limiter, "ANIME").await?;
     let target_title = media.title.preferred().to_string();
-    let image_url = media.cover_image.as_ref().and_then(|c| c.large.as_ref()).cloned().unwrap_or_default();
+    let image_url = media
+        .cover_image
+        .as_ref()
+        .and_then(|c| c.large.as_ref())
+        .cloned()
+        .unwrap_or_default();
 
     let embed = serenity::CreateEmbed::new()
         .title("Anime Quiz: Guess the Title!")
-        .description("You have 30 seconds to type the title in chat or click the button to reveal it.")
+        .description(
+            "You have 30 seconds to type the title in chat or click the button to reveal it.",
+        )
         .image(image_url)
         .colour(accent_color.unwrap_or(0xFFA500));
 
     let ctx_id = ctx.id();
     let button_id = format!("{}reveal", ctx_id);
 
-    let reply = poise::CreateReply::default()
-        .embed(embed)
-        .components(vec![serenity::CreateActionRow::Buttons(vec![
-            serenity::CreateButton::new(&button_id).label("Reveal Answer").style(serenity::ButtonStyle::Primary)
-        ])]);
+    let reply = poise::CreateReply::default().embed(embed).components(vec![
+        serenity::CreateActionRow::Buttons(vec![
+            serenity::CreateButton::new(&button_id)
+                .label("Reveal Answer")
+                .style(serenity::ButtonStyle::Primary),
+        ]),
+    ]);
 
     ctx.send(reply).await?;
 

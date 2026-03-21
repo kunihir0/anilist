@@ -1,11 +1,7 @@
 use crate::{
     api::anilist::fetch_airing,
     models::bot_data::{Context, Error},
-    utils::{
-        embeds::airing_page_embed,
-        errors::reply_error,
-        pagination::paginate,
-    },
+    utils::{embeds::airing_page_embed, errors::reply_error, pagination::paginate},
 };
 
 /// Show currently airing anime with episode countdowns.
@@ -33,7 +29,13 @@ pub async fn airing(ctx: Context<'_>) -> Result<(), Error> {
                 .iter()
                 .enumerate()
                 .map(|(i, chunk)| {
-                    airing_page_embed(chunk, i + 1, total_pages, prefs.title_language.clone(), accent_color)
+                    airing_page_embed(
+                        chunk,
+                        i + 1,
+                        total_pages,
+                        prefs.title_language.clone(),
+                        accent_color,
+                    )
                 })
                 .collect();
 

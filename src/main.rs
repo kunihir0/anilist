@@ -1,19 +1,19 @@
 mod api;
 mod commands;
 mod models;
+mod store;
 mod tasks;
 mod utils;
-mod store;
 
-use models::bot_data::Data;
 use api::cache::{Cache, RateLimiter};
+use models::bot_data::Data;
 use poise::serenity_prelude as serenity;
 use reqwest::Client;
-use tracing::{error, info};
 use std::sync::Arc;
 use store::Store;
-use tokio_cron_scheduler::JobScheduler;
 use tokio::sync::RwLock;
+use tokio_cron_scheduler::JobScheduler;
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() {
@@ -26,16 +26,23 @@ async fn main() {
 
     let _ = dotenvy::dotenv();
 
-    let token = std::env::var("DISCORD_TOKEN")
-        .expect("DISCORD_TOKEN is not set");
+    let token = std::env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN is not set");
 
     let guild_id: Option<serenity::GuildId> = std::env::var("GUILD_ID")
         .ok()
         .and_then(|id| id.parse::<u64>().ok())
         .map(serenity::GuildId::new);
 
-    let store = Arc::new(Store::new("store.json".into()).await.expect("Failed to initialize store"));
-    let scheduler = JobScheduler::new().await.expect("Failed to create scheduler");
+    let db_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:anilist.db?mode=rwc".to_string());
+    let store = Arc::new(
+        Store::new(&db_url)
+            .await
+            .expect("Failed to initialize store"),
+    );
+    let scheduler = JobScheduler::new()
+        .await
+        .expect("Failed to create scheduler");
     let genres_cache = Arc::new(RwLock::new(Vec::new()));
 
     let framework = poise::Framework::builder()
@@ -106,12 +113,12 @@ async fn main() {
 
                 let cmd_names: Vec<String> = framework.options().commands.iter().map(|c| c.name.to_string()).collect();
                 utils::startup::print_banner(&ready.user.name, ready.guilds.len(), &cmd_names);
-                
+
                 let client = Client::builder()
                     .timeout(std::time::Duration::from_secs(10))
                     .build()
                     .expect("Failed to build reqwest client");
-                
+
                 let cache = Cache::new(300);
                 let rate_limiter = RateLimiter::new(90, 60);
 
@@ -144,7 +151,8 @@ async fn main() {
         })
         .build();
 
-    let intents = serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
+    let intents =
+        serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
 
     let mut client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)

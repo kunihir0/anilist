@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::store::TitleLanguage;
+use serde::{Deserialize, Serialize};
 
 // ─── GraphQL envelope ────────────────────────────────────────────────────────
 
@@ -64,9 +64,9 @@ impl FuzzyDate {
     pub fn display(&self) -> String {
         match (self.year, self.month, self.day) {
             (Some(y), Some(m), Some(d)) => format!("{y}-{m:02}-{d:02}"),
-            (Some(y), Some(m), None)    => format!("{y}-{m:02}"),
-            (Some(y), None,    None)    => format!("{y}"),
-            _                           => "Unknown".to_string(),
+            (Some(y), Some(m), None) => format!("{y}-{m:02}"),
+            (Some(y), None, None) => format!("{y}"),
+            _ => "Unknown".to_string(),
         }
     }
 }
@@ -147,13 +147,13 @@ impl NextAiringEpisode {
     /// Format seconds-until-airing as "Xd Yh Zm"
     pub fn countdown(&self) -> String {
         let total = self.time_until_airing.max(0) as u64;
-        let days    = total / 86400;
-        let hours   = (total % 86400) / 3600;
+        let days = total / 86400;
+        let hours = (total % 86400) / 3600;
         let minutes = (total % 3600) / 60;
         match (days, hours) {
             (0, 0) => format!("{minutes}m"),
-            (0, h)  => format!("{h}h {minutes}m"),
-            (d, h)  => format!("{d}d {h}h"),
+            (0, h) => format!("{h}h {minutes}m"),
+            (d, h) => format!("{d}d {h}h"),
         }
     }
 }

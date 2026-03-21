@@ -1,12 +1,9 @@
-use poise::CreateReply;
 use crate::{
     api::anilist::fetch_favourites,
     models::bot_data::{Context, Error},
-    utils::{
-        embeds::favourites_embed,
-        errors::reply_error,
-    },
+    utils::{embeds::favourites_embed, errors::reply_error},
 };
+use poise::CreateReply;
 
 /// Look up a user's public AniList favourites.
 #[poise::command(slash_command, prefix_command)]
@@ -24,9 +21,21 @@ pub async fn favourites(
         None
     };
 
-    match fetch_favourites(&data.http_client, &data.cache, &data.rate_limiter, &username).await {
+    match fetch_favourites(
+        &data.http_client,
+        &data.cache,
+        &data.rate_limiter,
+        &username,
+    )
+    .await
+    {
         Ok(user) => {
-            ctx.send(CreateReply::default().embed(favourites_embed(&user, prefs.title_language, accent_color))).await?;
+            ctx.send(CreateReply::default().embed(favourites_embed(
+                &user,
+                prefs.title_language,
+                accent_color,
+            )))
+            .await?;
         }
         Err(e) => {
             tracing::warn!("Favourites fetch failed for {username:?}: {e}");
