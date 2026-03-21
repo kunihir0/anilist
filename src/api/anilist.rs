@@ -3,7 +3,8 @@ use serde_json::json;
 
 use crate::models::responses::{
     AniListApiError, AniListErrorResponse, AniListUser, Character, CharacterData,
-    GraphQlResponse, Media, MediaSearchData, Studio, StudioData, UserData,
+    FavouritesData, GraphQlResponse, Media, MediaRecommendationInfo, MediaSearchData,
+    RecommendationData, Staff, StaffData, Studio, StudioData, UserData, UserFavourites,
 };
 use super::queries;
 use super::cache::{Cache, RateLimiter};
@@ -221,8 +222,9 @@ pub async fn fetch_airing(
     if let Some(cached) = cache.get::<Vec<Media>>(&key).await {
         return Ok(cached);
     }
+    let vars = json!({ "type": "ANIME" });
     let data: MediaSearchData =
-        graphql_post(client, rate_limiter, queries::AIRING_QUERY, json!({})).await?;
+        graphql_post(client, rate_limiter, queries::AIRING_QUERY, vars).await?;
     let results = data.page.media;
     cache.set(key, &results).await;
     Ok(results)
@@ -298,6 +300,99 @@ pub async fn fetch_user(
     let vars = json!({ "name": username });
     let data: UserData =
         graphql_post(client, rate_limiter, queries::USER_QUERY, vars).await?;
+    cache.set(key, &data.user).await;
+    Ok(data.user)
+}
+
+/// Fetch a staff by name.
+pub async fn fetch_staff(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    search: &str,
+) -> Result<Staff, Error> {
+    let key = format!("staff:{search}");
+    if let Some(cached) = cache.get::<Staff>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "search": search });
+    let data: StaffData =
+        graphql_post(client, rate_limiter, queries::STAFF_QUERY, vars).await?;
+    cache.set(key, &data.staff).await;
+    Ok(data.staff)
+}
+
+/// Fetch recommendations for a media title.
+pub async fn fetch_recommendations(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    search: &str,
+) -> Result<MediaRecommendationInfo, Error> {
+    let key = format!("recommendations:{search}");
+    if let Some(cached) = cache.get::<MediaRecommendationInfo>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "search": search });
+    let data: RecommendationData =
+        graphql_post(client, rate_limiter, queries::RECOMMENDATIONS_QUERY, vars).await?;
+    cache.set(key, &data.media).await;
+    Ok(data.media)
+}
+
+/// Fetch trending media.
+pub async fn fetch_trending(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    media_type: &str,
+) -> Result<Vec<Media>, Error> {
+    let key = format!("trending:{media_type}");
+    if let Some(cached) = cache.get::<Vec<Media>>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "type": media_type });
+    let data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::TRENDING_QUERY, vars).await?;
+    let results = data.page.media;
+    cache.set(key, &results).await;
+    Ok(results)
+}
+
+/// Fetch media by genre.
+pub async fn fetch_genre(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    genre: &str,
+    media_type: &str,
+) -> Result<Vec<Media>, Error> {
+    let key = format!("genre:{genre}:{media_type}");
+    if let Some(cached) = cache.get::<Vec<Media>>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "genre": genre, "type": media_type });
+    let data: MediaSearchData =
+        graphql_post(client, rate_limiter, queries::GENRE_QUERY, vars).await?;
+    let results = data.page.media;
+    cache.set(key, &results).await;
+    Ok(results)
+}
+
+/// Fetch a user's favourites.
+pub async fn fetch_favourites(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    username: &str,
+) -> Result<UserFavourites, Error> {
+    let key = format!("favourites:{username}");
+    if let Some(cached) = cache.get::<UserFavourites>(&key).await {
+        return Ok(cached);
+    }
+    let vars = json!({ "name": username });
+    let data: FavouritesData =
+        graphql_post(client, rate_limiter, queries::FAVOURITES_QUERY, vars).await?;
     cache.set(key, &data.user).await;
     Ok(data.user)
 }

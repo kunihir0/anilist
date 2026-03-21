@@ -49,11 +49,16 @@ query ($search: String) {
     image { large }
     siteUrl
     media(perPage: 6, sort: POPULARITY_DESC) {
-      nodes {
-        title { romaji english }
-        type
-        siteUrl
-        coverImage { large }
+      edges {
+        node {
+          title { romaji english }
+          type
+          siteUrl
+        }
+        voiceActors(language: JAPANESE) {
+          name { full }
+          siteUrl
+        }
       }
     }
   }
@@ -79,6 +84,86 @@ query ($search: String) {
 }
 "#;
 
+/// Search staff by name.
+pub const STAFF_QUERY: &str = r#"
+query ($search: String) {
+  Staff(search: $search) {
+    id
+    name { full native }
+    description(asHtml: false)
+    image { large }
+    siteUrl
+    isBirthday
+    staffMedia(perPage: 6, sort: POPULARITY_DESC) {
+      nodes {
+        title { romaji english }
+        type
+        siteUrl
+      }
+    }
+  }
+}
+"#;
+
+/// Get recommendations for a media title.
+pub const RECOMMENDATIONS_QUERY: &str = r#"
+query ($search: String) {
+  Media(search: $search) {
+    id
+    title { romaji english native }
+    recommendations(perPage: 5, sort: RATING_DESC) {
+      nodes {
+        mediaRecommendation {
+          title { romaji english }
+          siteUrl
+        }
+      }
+    }
+  }
+}
+"#;
+
+/// Get trending media.
+pub const TRENDING_QUERY: &str = r#"
+query ($type: MediaType) {
+  Page(perPage: 10) {
+    media(type: $type, sort: [TRENDING_DESC]) {
+      title { romaji english }
+      siteUrl
+      averageScore
+    }
+  }
+}
+"#;
+
+/// Get media by genre.
+pub const GENRE_QUERY: &str = r#"
+query ($genre: String, $type: MediaType) {
+  Page(perPage: 10) {
+    media(genre_in: [$genre], type: $type, sort: [POPULARITY_DESC]) {
+      title { romaji english }
+      siteUrl
+      averageScore
+    }
+  }
+}
+"#;
+
+/// Get a user's favourites.
+pub const FAVOURITES_QUERY: &str = r#"
+query ($name: String) {
+  User(name: $name) {
+    name siteUrl
+    favourites {
+      anime(perPage: 5) { nodes { title { romaji english } siteUrl } }
+      manga(perPage: 5) { nodes { title { romaji english } siteUrl } }
+      characters(perPage: 5) { nodes { name { full } siteUrl } }
+      studios(perPage: 5) { nodes { name siteUrl } }
+    }
+  }
+}
+"#;
+
 /// Upcoming anime for a given season and year.
 pub const UPCOMING_QUERY: &str = r#"
 query ($season: MediaSeason, $seasonYear: Int) {
@@ -98,10 +183,10 @@ query ($season: MediaSeason, $seasonYear: Int) {
 
 /// Currently airing anime with next-episode countdown.
 pub const AIRING_QUERY: &str = r#"
-query {
+query ($type: MediaType) {
   Page(perPage: 10) {
     pageInfo { total currentPage lastPage hasNextPage }
-    media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC) {
+    media(type: $type, status: RELEASING, sort: POPULARITY_DESC) {
       id
       title { romaji english native }
       episodes format averageScore
@@ -140,7 +225,10 @@ query ($name: String) {
     avatar { large }
     siteUrl
     statistics {
-      anime { count episodesWatched minutesWatched meanScore }
+      anime {
+        count episodesWatched minutesWatched meanScore
+        genres(limit: 5, sort: COUNT_DESC) { genre count }
+      }
       manga { count chaptersRead meanScore }
     }
   }

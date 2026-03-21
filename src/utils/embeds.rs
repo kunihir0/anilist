@@ -1,6 +1,8 @@
 use poise::serenity_prelude::{self as serenity, CreateEmbed};
 
-use crate::models::responses::{AniListUser, Character, Media, Studio};
+use crate::models::responses::{
+    AniListUser, Character, Media, MediaRecommendationInfo, Staff, Studio, UserFavourites,
+};
 
 const ANILIST_BLUE: u32 = 0x02a9ff;
 const PURPLE:       u32 = 0x9b59b6;
@@ -52,8 +54,8 @@ pub fn media_embed(media: &Media, media_type: &str) -> CreateEmbed {
     if let Some(vol) = media.volumes {
         embed = embed.field("Volumes", vol.to_string(), true);
     }
-    if let Some(url) = &media.cover_image.large {
-        embed = embed.thumbnail(url);
+    if let Some(url) = &media.cover_image.as_ref().and_then(|c| c.large.as_ref()) {
+        embed = embed.thumbnail(url.to_string());
     }
 
     embed
@@ -120,12 +122,18 @@ pub fn character_embed(character: &Character) -> CreateEmbed {
 
     let appearances: String = character
         .media
-        .nodes
+        .edges
         .iter()
-        .map(|n| {
-            let title = n.title.preferred();
-            let kind  = n.media_type.as_deref().unwrap_or("?");
-            format!("[{title}]({}) `{kind}`", n.site_url)
+        .map(|e| {
+            let title = e.node.title.preferred();
+            let kind  = e.node.media_type.as_deref().unwrap_or("?");
+            let mut s = format!("[{title}]({}) `{kind}`", e.node.site_url);
+            if let Some(va) = e.voice_actors.first() {
+                if let Some(va_name) = &va.name.full {
+                    s.push_str(&format!(" (VA: [{va_name}]({}))", va.site_url));
+                }
+            }
+            s
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -184,6 +192,122 @@ pub fn studio_embed(studio: &Studio) -> CreateEmbed {
     embed
 }
 
+// ─── Staff embed ─────────────────────────────────────────────────────────────
+
+pub fn staff_embed(staff: &Staff) -> CreateEmbed {
+    let description = staff
+        .description.as_deref()
+        .map(clean_html)
+        .map(|d| truncate(&d, 400))
+        .unwrap_or_else(|| "No description available.".to_string());
+
+    let name   = staff.name.preferred();
+    let native = staff.name.native.as_deref().unwrap_or("");
+    let bday   = if staff.is_birthday { " 🎂" } else { "" };
+
+    let works: String = staff
+        .staff_media
+        .nodes
+        .iter()
+        .map(|n| {
+            let title = n.title.preferred();
+            let kind  = n.media_type.as_deref().unwrap_or("?");
+            format!("[{title}]({}) `{kind}`", n.site_url)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mut embed = CreateEmbed::new()
+        .title(if native.is_empty() { format!("{name}{bday}") } else { format!("{name}  ({native}){bday}") })
+        .url(&staff.site_url)
+        .description(&description)
+        .colour(serenity::Colour::new(PURPLE))
+        .footer(serenity::CreateEmbedFooter::new(format!("AniList Staff ID {}", staff.id)));
+
+    if !works.is_empty() {
+        embed = embed.field("Works", &works, false);
+    }
+    if let Some(url) = &staff.image.large {
+        embed = embed.thumbnail(url);
+    }
+
+    embed
+}
+
+// ─── Recommendations embed ───────────────────────────────────────────────────
+
+pub fn recommendations_embed(media: &MediaRecommendationInfo) -> CreateEmbed {
+    let title = media.title.preferred();
+    let recs: String = media
+        .recommendations
+        .nodes
+        .iter()
+        .filter_map(|n| n.media_recommendation.as_ref())
+        .map(|r| format!("[{}]({})", r.title.preferred(), r.site_url))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    CreateEmbed::new()
+        .title(format!("Recommendations for {title}"))
+        .url(format!("https://anilist.co/anime/{}/recommendations", media.id))
+        .description(if recs.is_empty() { "No recommendations found.".to_string() } else { recs })
+        .colour(serenity::Colour::new(ANILIST_BLUE))
+}
+
+// ─── Media list embed (trending / genre) ─────────────────────────────────────
+
+pub fn media_list_embed(media: &[Media], title: &str) -> CreateEmbed {
+    let list: String = media
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let score = m.average_score.map(|s| format!(" • {s}/100")).unwrap_or_default();
+            format!("{}. [{}]({}){}", i + 1, m.title.preferred(), m.site_url, score)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    CreateEmbed::new()
+        .title(title)
+        .description(if list.is_empty() { "No results found.".to_string() } else { list })
+        .colour(serenity::Colour::new(ANILIST_BLUE))
+}
+
+// ─── Favourites embed ────────────────────────────────────────────────────────
+
+pub fn favourites_embed(user: &UserFavourites) -> CreateEmbed {
+    let mut embed = CreateEmbed::new()
+        .title(format!("{}'s Favourites", user.name))
+        .url(&user.site_url)
+        .colour(serenity::Colour::new(ANILIST_BLUE));
+
+    let anime: String = user.favourites.anime.nodes.iter()
+        .map(|n| format!("[{}]({})", n.title.preferred(), n.site_url))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !anime.is_empty() { embed = embed.field("Anime", anime, true); }
+
+    let manga: String = user.favourites.manga.nodes.iter()
+        .map(|n| format!("[{}]({})", n.title.preferred(), n.site_url))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !manga.is_empty() { embed = embed.field("Manga", manga, true); }
+
+    let characters: String = user.favourites.characters.nodes.iter()
+        .map(|n| format!("[{}]({})", n.name.preferred(), n.site_url))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !characters.is_empty() { embed = embed.field("Characters", characters, true); }
+
+    let studios: String = user.favourites.studios.nodes.iter()
+        .map(|n| format!("[{}]({})", n.name, n.site_url))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !studios.is_empty() { embed = embed.field("Studios", studios, true); }
+
+    embed
+}
+
 // ─── User profile embed ───────────────────────────────────────────────────────
 
 pub fn user_embed(user: &AniListUser) -> CreateEmbed {
@@ -211,6 +335,15 @@ pub fn user_embed(user: &AniListUser) -> CreateEmbed {
         .field("Manga Read",       manga.count.to_string(),                   true)
         .field("Chapters Read",    manga.chapters_read.to_string(),           true)
         .field("Manga Mean Score", format!("{:.1}/100", manga.mean_score),    true);
+
+    if !user.statistics.anime.genres.is_empty() {
+        let favorite_genres = user.statistics.anime.genres.iter()
+            .take(5)
+            .map(|g| format!("{} ({})", g.genre, g.count))
+            .collect::<Vec<_>>()
+            .join(", ");
+        embed = embed.field("Top Genres", favorite_genres, false);
+    }
 
     if let Some(url) = &user.avatar.large {
         embed = embed.thumbnail(url);

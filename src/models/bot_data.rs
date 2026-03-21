@@ -11,6 +11,25 @@ pub struct Data {
     pub rate_limiter: RateLimiter,
 }
 
+// ─── Shared Types ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, poise::ChoiceParameter, Clone, Copy, PartialEq, Eq)]
+pub enum MediaType {
+    #[name = "ANIME"]
+    Anime,
+    #[name = "MANGA"]
+    Manga,
+}
+
+impl MediaType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MediaType::Anime => "ANIME",
+            MediaType::Manga => "MANGA",
+        }
+    }
+}
+
 // ─── Poise type aliases ───────────────────────────────────────────────────────
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
