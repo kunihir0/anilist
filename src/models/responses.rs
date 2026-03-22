@@ -594,6 +594,19 @@ pub struct GenreCollectionData {
     pub genres: Vec<String>,
 }
 
+// ─── Tag Collection ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagCollectionData {
+    #[serde(rename = "MediaTagCollection")]
+    pub tags: Vec<MediaTag>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaTag {
+    pub name: String,
+}
+
 // ─── Staff Birthday ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -44,6 +44,7 @@ async fn main() {
         .await
         .expect("Failed to create scheduler");
     let genres_cache = Arc::new(RwLock::new(Vec::new()));
+    let tags_cache = Arc::new(RwLock::new(Vec::new()));
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -97,6 +98,7 @@ async fn main() {
         })
         .setup(move |ctx, ready, framework| {
             let genres_cache = genres_cache.clone();
+            let tags_cache = tags_cache.clone();
             Box::pin(async move {
                 match guild_id {
                     Some(gid) => {
@@ -134,6 +136,18 @@ async fn main() {
                     }
                 }
 
+                // Pre-fetch tags for autocomplete
+                match api::anilist::fetch_tags(&client, &cache, &rate_limiter).await {
+                    Ok(tags) => {
+                        info!("Cached {} tags for autocomplete.", tags.len());
+                        let mut t_lock = tags_cache.write().await;
+                        *t_lock = tags;
+                    }
+                    Err(e) => {
+                        error!("Failed to pre-fetch tags: {}", e);
+                    }
+                }
+
                 let data = Data {
                     http_client: client,
                     cache,
@@ -141,6 +155,7 @@ async fn main() {
                     store: store.clone(),
                     scheduler: scheduler.clone(),
                     genres: genres_cache,
+                    tags_cache,
                 };
 
                 tasks::presence::spawn(ctx.clone());

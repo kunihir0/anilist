@@ -110,6 +110,7 @@ pub const TRENDING_QUERY: &str = r#"
 query ($type: MediaType) {
   Page(perPage: 10) {
     media(type: $type, sort: [TRENDING_DESC]) {
+      id
       title { romaji english }
       siteUrl
       averageScore
@@ -122,6 +123,7 @@ pub const GENRE_QUERY: &str = r#"
 query ($genre: String, $type: MediaType) {
   Page(perPage: 10) {
     media(genre_in: [$genre], type: $type, sort: [POPULARITY_DESC]) {
+      id
       title { romaji english }
       siteUrl
       averageScore
@@ -182,6 +184,27 @@ query ($type: MediaType, $page: Int) {
 pub const GENRE_COLLECTION_QUERY: &str = r#"
 query {
   GenreCollection
+}
+"#;
+
+pub const TAG_COLLECTION_QUERY: &str = r#"
+query {
+  MediaTagCollection {
+    name
+  }
+}
+"#;
+
+pub const TAG_QUERY: &str = r#"
+query ($tag: String, $type: MediaType) {
+  Page(perPage: 10) {
+    media(tag: $tag, type: $type, sort: [POPULARITY_DESC]) {
+      id
+      title { romaji english }
+      siteUrl
+      averageScore
+    }
+  }
 }
 "#;
 

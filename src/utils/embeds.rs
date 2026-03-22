@@ -106,11 +106,18 @@ pub fn airing_page_embed(
     shows: &[Media],
     page: usize,
     total_pages: usize,
+    day_filter: Option<&str>,
     lang: Option<TitleLanguage>,
     guild_color: Option<u32>,
 ) -> CreateEmbed {
+    let title = if let Some(day) = day_filter {
+        format!("Currently Airing — {}", day)
+    } else {
+        "Currently Airing".to_string()
+    };
+
     let mut embed = CreateEmbed::new()
-        .title("Currently Airing")
+        .title(title)
         .colour(get_color(guild_color, TEAL))
         .timestamp(serenity::Timestamp::now())
         .footer(serenity::CreateEmbedFooter::new(format!(
@@ -667,6 +674,50 @@ pub fn compare_embed(u1: &AniListUser, u2: &AniListUser, guild_color: Option<u32
             user_stats(u2),
             true,
         )
+}
+
+// ─── Compare Media embed ───────────────────────────────────────────────────────
+
+pub fn media_compare_embed(
+    m1: &crate::models::responses::Media,
+    m2: &crate::models::responses::Media,
+    lang: Option<crate::store::TitleLanguage>,
+    guild_color: Option<u32>,
+) -> CreateEmbed {
+    let t1 = m1.title.get_title(lang.clone());
+    let t2 = m2.title.get_title(lang.clone());
+
+    let s1 = m1.average_score.map(|s| format!("{s}%")).unwrap_or_else(|| "N/A".to_string());
+    let s2 = m2.average_score.map(|s| format!("{s}%")).unwrap_or_else(|| "N/A".to_string());
+    
+    let e1 = m1.episodes.or(m1.chapters).map(|e| e.to_string()).unwrap_or_else(|| "?".to_string());
+    let e2 = m2.episodes.or(m2.chapters).map(|e| e.to_string()).unwrap_or_else(|| "?".to_string());
+    
+    let f1 = m1.format.as_deref().unwrap_or("?");
+    let f2 = m2.format.as_deref().unwrap_or("?");
+
+    let stat1 = format!(
+        "[AniList Page]({})\n**Score:** {}\n**Ep/Ch:** {}\n**Format:** {}\n**Status:** {}\n**Season:** {}",
+        m1.site_url,
+        s1, e1, f1,
+        m1.status.as_deref().unwrap_or("?"),
+        m1.season_year.map(|y| format!("{} {}", m1.season.as_deref().unwrap_or(""), y)).unwrap_or_else(|| "N/A".to_string()),
+    );
+
+    let stat2 = format!(
+        "[AniList Page]({})\n**Score:** {}\n**Ep/Ch:** {}\n**Format:** {}\n**Status:** {}\n**Season:** {}",
+        m2.site_url,
+        s2, e2, f2,
+        m2.status.as_deref().unwrap_or("?"),
+        m2.season_year.map(|y| format!("{} {}", m2.season.as_deref().unwrap_or(""), y)).unwrap_or_else(|| "N/A".to_string()),
+    );
+
+    CreateEmbed::new()
+        .title(format!("{} vs {}", t1, t2))
+        .colour(get_color(guild_color, ANILIST_BLUE))
+        .timestamp(serenity::Timestamp::now())
+        .field(t1, stat1, true)
+        .field(t2, stat2, true)
 }
 
 // ─── Server List embed ────────────────────────────────────────────────────────

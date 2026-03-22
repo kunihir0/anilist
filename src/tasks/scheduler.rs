@@ -82,7 +82,7 @@ async fn execute_job(
         }
         ContentType::AiringUpdate => {
             let shows = fetch_airing(&data.http_client, &data.cache, &data.rate_limiter).await?;
-            let embed = airing_page_embed(&shows, 1, 1, None, accent_color);
+            let embed = airing_page_embed(&shows, 1, 1, None, None, accent_color);
             channel_id
                 .send_message(&http, serenity::CreateMessage::new().embed(embed))
                 .await?;

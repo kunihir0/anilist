@@ -452,6 +452,44 @@ pub async fn fetch_genre(
     .await
 }
 
+pub async fn fetch_tags(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+) -> Result<Vec<String>, Error> {
+    fetch_cached(
+        client,
+        cache,
+        rate_limiter,
+        "tags:all".to_string(),
+        queries::TAG_COLLECTION_QUERY,
+        json!({}),
+        |d: crate::models::responses::TagCollectionData| d.tags.into_iter().map(|t| t.name).collect(),
+        Some(86400 * 7), // 1 week
+    )
+    .await
+}
+
+pub async fn fetch_by_tag(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    tag: &str,
+    media_type: &str,
+) -> Result<Vec<Media>, Error> {
+    fetch_cached(
+        client,
+        cache,
+        rate_limiter,
+        format!("tag:{tag}:{media_type}"),
+        queries::TAG_QUERY,
+        json!({ "tag": tag, "type": media_type }),
+        |d: MediaSearchData| d.page.media,
+        None,
+    )
+    .await
+}
+
 pub async fn fetch_favourites(
     client: &Client,
     cache: &Cache,

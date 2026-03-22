@@ -23,19 +23,21 @@ mod trending;
 mod upcoming;
 mod watch;
 mod watchlist;
+mod tag;
+mod compare_media;
 
 use crate::models::bot_data::{Data, Error};
 
 // ─── Autocomplete handlers ───────────────────────────────────────────────────
 
-async fn autocomplete_anime(
+pub async fn autocomplete_anime(
     ctx: crate::models::bot_data::Context<'_>,
     partial: &str,
 ) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
     autocomplete_media(ctx, partial, "ANIME").await
 }
 
-async fn autocomplete_manga(
+pub async fn autocomplete_manga(
     ctx: crate::models::bot_data::Context<'_>,
     partial: &str,
 ) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
@@ -202,5 +204,7 @@ pub fn all() -> Vec<poise::Command<Data, Error>> {
         leaderboard::leaderboard(),
         recommend::recommend(),
         ping::ping(),
+        tag::tag(),
+        compare_media::compare_media(),
     ]
 }

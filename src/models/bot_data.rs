@@ -20,6 +20,8 @@ pub struct Data {
     pub scheduler: JobScheduler,
     /// Cached genres for autocomplete.
     pub genres: Arc<RwLock<Vec<String>>>,
+    /// Cached tags for autocomplete.
+    pub tags_cache: Arc<RwLock<Vec<String>>>,
 }
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────
