@@ -37,6 +37,75 @@ impl QuizDifficulty {
     }
 }
 
+// ─── Title matching helpers ──────────────────────────────────────────────────
+
+/// Normalize a string for fuzzy comparison: lowercase, strip punctuation, collapse whitespace.
+fn normalize(s: &str) -> String {
+    s.to_lowercase()
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == ' ' {
+                c
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Check if guess matches any of the known titles for a media.
+fn is_correct_guess(
+    guess: &str,
+    romaji: Option<&str>,
+    english: Option<&str>,
+    native: Option<&str>,
+) -> bool {
+    let norm_guess = normalize(guess);
+    if norm_guess.len() < 3 {
+        return false;
+    }
+
+    // Collect all valid title variants
+    let titles: Vec<String> = [romaji, english, native]
+        .iter()
+        .filter_map(|t| t.map(normalize))
+        .filter(|t| !t.is_empty() && t != "unknown title")
+        .collect();
+
+    for title in &titles {
+        // Exact match after normalization
+        if norm_guess == *title {
+            return true;
+        }
+        // Guess is a substantial substring of the title (≥60% of the title length)
+        if title.contains(&norm_guess) && norm_guess.len() * 100 / title.len().max(1) >= 60 {
+            return true;
+        }
+        // Title is contained within the guess (user typed extra words around it)
+        if norm_guess.contains(title.as_str()) {
+            return true;
+        }
+        // Word-level similarity: check if most words of the title appear in the guess
+        let title_words: Vec<&str> = title.split_whitespace().collect();
+        let guess_words: Vec<&str> = norm_guess.split_whitespace().collect();
+        if title_words.len() >= 2 {
+            let matched = title_words
+                .iter()
+                .filter(|tw| guess_words.iter().any(|gw| *gw == **tw))
+                .count();
+            // If ≥75% of the title words are in the guess, accept it
+            if matched * 100 / title_words.len() >= 75 {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 /// Play a quick anime guessing quiz.
 #[poise::command(
     slash_command,
@@ -59,7 +128,8 @@ pub async fn quiz(
     let accent_color = settings.accent_color;
 
     // Determine the page based on difficulty
-    let page = difficulty.unwrap_or(QuizDifficulty::Medium).get_rand_page();
+    let diff = difficulty.unwrap_or(QuizDifficulty::Medium);
+    let page = diff.get_rand_page();
 
     // Fetch a random anime for the quiz
     let media = fetch_random(&data.http_client, &data.rate_limiter, "ANIME", Some(page)).await?;
@@ -71,13 +141,28 @@ pub async fn quiz(
         .cloned()
         .unwrap_or_default();
 
+    // Clone title variants for matching
+    let romaji = media.title.romaji.clone();
+    let english = media.title.english.clone();
+    let native = media.title.native.clone();
+
+    let diff_label = match diff {
+        QuizDifficulty::Easy => "Easy 🟢",
+        QuizDifficulty::Medium => "Medium 🟡",
+        QuizDifficulty::Hard => "Hard 🔴",
+    };
+
     let embed = serenity::CreateEmbed::new()
-        .title("Anime Quiz: Guess the Title!")
+        .title(format!("Anime Quiz — {}", diff_label))
         .description(
-            "You have 30 seconds to type the title in chat or click the button to reveal it.",
+            "Guess the anime title! Type your answer in chat.\n\
+             You have **30 seconds**. Use the buttons below for hints or to give up.",
         )
         .image(image_url)
-        .colour(accent_color.unwrap_or(0xFFA500));
+        .colour(accent_color.unwrap_or(0xFFA500))
+        .footer(serenity::CreateEmbedFooter::new(
+            "Tip: English or romaji titles both work!",
+        ));
 
     let ctx_id = ctx.id();
     let reveal_id = format!("{}reveal", ctx_id);
@@ -86,18 +171,15 @@ pub async fn quiz(
     let reply = poise::CreateReply::default().embed(embed).components(vec![
         serenity::CreateActionRow::Buttons(vec![
             serenity::CreateButton::new(&reveal_id)
-                .label("Reveal Answer")
+                .label("Give Up")
                 .style(serenity::ButtonStyle::Danger),
             serenity::CreateButton::new(&hint_id)
                 .label("Hint")
-                .style(serenity::ButtonStyle::Primary),
+                .style(serenity::ButtonStyle::Secondary),
         ]),
     ]);
 
     ctx.send(reply).await?;
-
-    // Use cloned title for the filter closure
-    let target_clone = target_title.to_lowercase();
 
     // We listen for messages in the same channel to see if anyone guesses correctly
     let mut message_collector = serenity::MessageCollector::new(ctx.serenity_context())
@@ -113,6 +195,7 @@ pub async fn quiz(
 
     let mut participants = std::collections::HashSet::new();
     let start_time = std::time::Instant::now();
+    let mut hint_stage = 0u8; // 0 = no hint shown, 1 = genre, 2 = genre + year
 
     loop {
         tokio::select! {
@@ -121,20 +204,37 @@ pub async fn quiz(
                 let user_id = m.author.id.get();
                 participants.insert(user_id);
 
-                let guess = m.content.to_lowercase();
-                if guess.len() > 3 && (target_clone.contains(&guess) || guess.contains(&target_clone)) {
+                if is_correct_guess(
+                    &m.content,
+                    romaji.as_deref(),
+                    english.as_deref(),
+                    native.as_deref(),
+                ) {
                     data.store.increment_quiz_score(guild_id, user_id, false).await?;
 
-                    for p in participants {
+                    // Break streaks for everyone else who participated
+                    for &p in &participants {
                         if p != user_id {
                             let _ = data.store.increment_quiz_score(guild_id, p, true).await;
                         }
                     }
 
+                    let elapsed = start_time.elapsed().as_secs();
+                    let speed_bonus = if elapsed <= 5 { " ⚡ Lightning fast!" } else if elapsed <= 15 { " 🔥 Quick!" } else { "" };
+
                     let win_embed = serenity::CreateEmbed::new()
-                        .title("Correct!")
-                        .description(format!("<@{}> guessed it correctly!\n\nThe answer was: **{}**\n[AniList Link]({})", user_id, target_title, media.site_url))
-                        .colour(serenity::Colour::new(0x00FF00));
+                        .title("✅ Correct!")
+                        .description(format!(
+                            "<@{}> guessed it in **{}s**!{}\n\nThe answer was: **{}**\n[View on AniList]({})",
+                            user_id, elapsed, speed_bonus, target_title, media.site_url
+                        ))
+                        .colour(serenity::Colour::new(0x2ECC71))
+                        .thumbnail(
+                            media.cover_image.as_ref()
+                                .and_then(|c| c.large.as_ref())
+                                .cloned()
+                                .unwrap_or_default()
+                        );
 
                     ctx.send(poise::CreateReply::default().embed(win_embed).components(vec![])).await?;
                     break;
@@ -144,14 +244,18 @@ pub async fn quiz(
                 let custom_id = &mci.data.custom_id;
 
                 if custom_id.ends_with("reveal") {
-                    for p in participants {
+                    // Break streaks for all participants
+                    for &p in &participants {
                         let _ = data.store.increment_quiz_score(guild_id, p, true).await;
                     }
 
                     let reveal_embed = serenity::CreateEmbed::new()
-                        .title("Quiz Answer")
-                        .description(format!("The answer was: **{}**\n[AniList Link]({})", target_title, media.site_url))
-                        .colour(serenity::Colour::new(0x00FF00));
+                        .title("💡 Quiz Answer")
+                        .description(format!(
+                            "Nobody got it! The answer was: **{}**\n[View on AniList]({})",
+                            target_title, media.site_url
+                        ))
+                        .colour(serenity::Colour::new(0xE74C3C));
 
                     mci.create_response(
                         &ctx.serenity_context(),
@@ -164,15 +268,28 @@ pub async fn quiz(
                     break;
                 } else if custom_id.ends_with("hint") {
                     let elapsed = start_time.elapsed().as_secs();
-                    let hint_text = if elapsed < 15 {
-                        "Wait a bit longer for a hint (15s minimum for Genre, 20s for Year).".to_string()
-                    } else if elapsed < 20 {
+                    let hint_text = if elapsed < 10 && hint_stage == 0 {
+                        "⏳ Wait at least 10 seconds before getting a hint!".to_string()
+                    } else if hint_stage == 0 {
+                        hint_stage = 1;
                         let genres = media.genres.join(", ");
-                        format!("Hint (Genre): {}", if genres.is_empty() { "Unknown" } else { &genres })
+                        format!(
+                            "🔍 **Genre:** {}",
+                            if genres.is_empty() { "Unknown".to_string() } else { genres }
+                        )
+                    } else if hint_stage == 1 {
+                        hint_stage = 2;
+                        let year = media.season_year
+                            .map(|y| y.to_string())
+                            .unwrap_or_else(|| "Unknown".to_string());
+                        let eps = media.episodes
+                            .map(|e| format!("{} episodes", e))
+                            .unwrap_or_else(|| "Unknown length".to_string());
+                        format!("🔍 **Year:** {} | **Length:** {}", year, eps)
                     } else {
-                        let genres = media.genres.join(", ");
-                        let year = media.season_year.map(|y| y.to_string()).unwrap_or_else(|| "Unknown".to_string());
-                        format!("Hint (Genre & Year): {} | {}", if genres.is_empty() { "Unknown" } else { &genres }, year)
+                        // Third hint: first letter
+                        let first_char = target_title.chars().next().unwrap_or('?');
+                        format!("🔍 **Starts with:** {}", first_char)
                     };
 
                     let _ = mci.create_response(
@@ -186,10 +303,20 @@ pub async fn quiz(
                 }
             }
             else => {
-                for p in participants {
+                // Time's up
+                for &p in &participants {
                     let _ = data.store.increment_quiz_score(guild_id, p, true).await;
                 }
-                ctx.say(format!("Time's up! The answer was: **{}**", target_title)).await?;
+
+                let timeout_embed = serenity::CreateEmbed::new()
+                    .title("⏰ Time's Up!")
+                    .description(format!(
+                        "The answer was: **{}**\n[View on AniList]({})",
+                        target_title, media.site_url
+                    ))
+                    .colour(serenity::Colour::new(0xE74C3C));
+
+                ctx.send(poise::CreateReply::default().embed(timeout_embed).components(vec![])).await?;
                 break;
             }
         }

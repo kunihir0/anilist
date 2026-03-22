@@ -363,9 +363,9 @@ pub struct Staff {
     pub image: StaffImage,
     #[serde(rename = "siteUrl")]
     pub site_url: String,
-    #[serde(rename = "isBirthday")]
+    #[serde(rename = "isBirthday", default)]
     pub is_birthday: bool,
-    #[serde(rename = "staffMedia")]
+    #[serde(rename = "staffMedia", default)]
     pub staff_media: StaffMediaConnection,
 }
 
@@ -386,7 +386,7 @@ pub struct StaffImage {
     pub large: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StaffMediaConnection {
     pub nodes: Vec<StaffMediaNode>,
 }

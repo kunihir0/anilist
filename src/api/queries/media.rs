@@ -212,6 +212,8 @@ pub const MEDIA_CHARACTERS_BY_ID_QUERY: &str = r#"
 query ($id: Int) {
   Media(id: $id) {
     id
+    title { romaji english native }
+    siteUrl
     characters(perPage: 15, sort: [ROLE, RELEVANCE, ID]) {
       edges {
         role
@@ -230,6 +232,8 @@ pub const MEDIA_RECOMMENDATIONS_BY_ID_QUERY: &str = r#"
 query ($id: Int) {
   Media(id: $id) {
     id
+    title { romaji english native }
+    siteUrl
     recommendations(perPage: 5, sort: RATING_DESC) {
       nodes {
         mediaRecommendation {
