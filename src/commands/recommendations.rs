@@ -6,7 +6,12 @@ use crate::{
 use poise::CreateReply;
 
 /// Get top recommendations for a media title.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    user_cooldown = 5,
+    category = "Discovery"
+)]
 pub async fn recommendations(
     ctx: Context<'_>,
     #[description = "Media title to get recommendations for"] title: String,

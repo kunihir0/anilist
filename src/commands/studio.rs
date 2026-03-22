@@ -6,7 +6,7 @@ use crate::{
 use poise::CreateReply;
 
 /// Search AniList for a studio by name.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Search")]
 pub async fn studio(
     ctx: Context<'_>,
     #[description = "Studio name to search for"] name: String,

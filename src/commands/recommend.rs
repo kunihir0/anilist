@@ -7,7 +7,12 @@ use poise::CreateReply;
 use std::collections::HashSet;
 
 /// Comparison-based recommendations.
-#[poise::command(slash_command, prefix_command, subcommands("compare"))]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    subcommands("compare"),
+    category = "Social"
+)]
 pub async fn recommend(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }

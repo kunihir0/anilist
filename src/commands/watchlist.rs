@@ -6,7 +6,7 @@ use crate::{
 use poise::{ChoiceParameter, CreateReply};
 
 /// Look up a user's media watchlist collection.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Social")]
 pub async fn watchlist(
     ctx: Context<'_>,
     #[description = "AniList username"] username: String,

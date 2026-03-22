@@ -6,7 +6,7 @@ use crate::{
 use poise::CreateReply;
 
 /// Compare two AniList user profiles side by side.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Social")]
 pub async fn compare(
     ctx: Context<'_>,
     #[description = "First username"] user1: String,

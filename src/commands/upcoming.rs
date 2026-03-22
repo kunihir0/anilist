@@ -11,7 +11,12 @@ use chrono::{Datelike, Utc};
 use poise::CreateReply;
 
 /// Show upcoming anime for a given season and year.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    user_cooldown = 5,
+    category = "Discovery"
+)]
 pub async fn upcoming(
     ctx: Context<'_>,
     #[description = "Season (WINTER, SPRING, SUMMER, FALL)"] season: Option<String>,

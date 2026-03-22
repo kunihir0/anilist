@@ -9,7 +9,12 @@ use crate::{
 use poise::CreateReply;
 
 /// Search AniList for a staff member (VA, director, etc) by name.
-#[poise::command(slash_command, prefix_command, subcommands("search", "today"))]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    subcommands("search", "today"),
+    category = "Search"
+)]
 pub async fn staff(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }

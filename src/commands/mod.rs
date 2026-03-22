@@ -28,7 +28,7 @@ use crate::models::bot_data::{Data, Error};
 
 macro_rules! make_search_command {
     ($func_name:ident, $fetch_fn:path, $media_type:expr, $description:expr) => {
-        #[poise::command(slash_command, prefix_command)]
+        #[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Search")]
         #[doc = $description]
         pub async fn $func_name(
             ctx: crate::models::bot_data::Context<'_>,

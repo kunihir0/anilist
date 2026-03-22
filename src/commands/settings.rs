@@ -7,7 +7,9 @@ use poise::serenity_prelude as serenity;
     slash_command,
     prefix_command,
     subcommands("mod_role", "list", "color"),
-    guild_only
+    guild_only,
+    category = "Server",
+    default_member_permissions = "MANAGE_GUILD"
 )]
 pub async fn settings(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())

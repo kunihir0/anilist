@@ -6,7 +6,7 @@ use crate::{
 use poise::CreateReply;
 
 /// Look up a user's public AniList favourites.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Social")]
 pub async fn favourites(
     ctx: Context<'_>,
     #[description = "AniList username"] username: String,

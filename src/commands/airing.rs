@@ -5,7 +5,12 @@ use crate::{
 };
 
 /// Show currently airing anime with episode countdowns.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    user_cooldown = 5,
+    category = "Discovery"
+)]
 pub async fn airing(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();

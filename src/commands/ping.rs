@@ -1,8 +1,9 @@
 use crate::models::bot_data::{Context, Error};
+use poise::serenity_prelude::{self as serenity, CreateEmbed};
 use std::time::Instant;
 
 /// Check the bot's latency and AniList API response time.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, prefix_command, ephemeral, category = "Utility")]
 pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     let start = Instant::now();
 
@@ -21,11 +22,34 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
         .map(|d| d.as_millis())
         .unwrap_or(0);
 
-    ctx.say(format!(
-        "🏓 **Pong!**\n\n**Heartbeat:** {}ms\n**AniList API:** {}ms",
-        heartbeat, api_latency
-    ))
-    .await?;
+    let heartbeat_indicator = match heartbeat {
+        0..=100 => "🟢",
+        101..=250 => "🟡",
+        _ => "🔴",
+    };
+    let api_indicator = match api_latency {
+        0..=200 => "🟢",
+        201..=500 => "🟡",
+        _ => "🔴",
+    };
+
+    let embed = CreateEmbed::new()
+        .title("🏓 Pong!")
+        .colour(serenity::Colour::new(0x02a9ff))
+        .field(
+            "Gateway Heartbeat",
+            format!("{heartbeat_indicator} **{heartbeat}**ms"),
+            true,
+        )
+        .field(
+            "AniList API",
+            format!("{api_indicator} **{api_latency}**ms"),
+            true,
+        )
+        .timestamp(serenity::Timestamp::now())
+        .footer(serenity::CreateEmbedFooter::new("Powered by AniList"));
+
+    ctx.send(poise::CreateReply::default().embed(embed)).await?;
 
     Ok(())
 }

@@ -6,7 +6,7 @@ use crate::{
 use poise::CreateReply;
 
 /// Look up a public AniList user profile and display their stats.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Social")]
 pub async fn profile(
     ctx: Context<'_>,
     #[description = "AniList username to look up"] username: String,

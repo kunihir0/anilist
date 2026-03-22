@@ -6,7 +6,13 @@ use futures::StreamExt;
 use poise::serenity_prelude as serenity;
 
 /// Play a quick anime guessing quiz.
-#[poise::command(slash_command, prefix_command, guild_only)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    guild_only,
+    user_cooldown = 10,
+    category = "Server"
+)]
 pub async fn quiz(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();

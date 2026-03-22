@@ -2,7 +2,12 @@ use crate::models::bot_data::{Context, Error};
 use crate::store::TitleLanguage;
 
 /// Manage your personal preferences.
-#[poise::command(slash_command, prefix_command, subcommands("title_language"))]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    subcommands("title_language"),
+    category = "Utility"
+)]
 pub async fn prefs(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }

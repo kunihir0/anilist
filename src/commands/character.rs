@@ -6,7 +6,7 @@ use crate::{
 use poise::CreateReply;
 
 /// Search AniList for a character by name.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Search")]
 pub async fn character(
     ctx: Context<'_>,
     #[description = "Character name to search for"] name: String,

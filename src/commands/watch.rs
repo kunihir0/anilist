@@ -10,7 +10,8 @@ use poise::serenity_prelude as serenity;
     slash_command,
     prefix_command,
     subcommands("set", "next", "vote"),
-    guild_only
+    guild_only,
+    category = "Server"
 )]
 pub async fn watch(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())

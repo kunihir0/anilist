@@ -6,7 +6,12 @@ use crate::{
 use poise::{ChoiceParameter, CreateReply};
 
 /// See what's currently trending on AniList.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    user_cooldown = 5,
+    category = "Discovery"
+)]
 pub async fn trending(
     ctx: Context<'_>,
     #[description = "Media type (ANIME or MANGA)"] media_type: Option<MediaType>,

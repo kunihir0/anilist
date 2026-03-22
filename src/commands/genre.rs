@@ -17,7 +17,12 @@ async fn autocomplete_genre(ctx: Context<'_>, partial: &str) -> impl Iterator<It
 }
 
 /// Browse media by genre.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    user_cooldown = 5,
+    category = "Discovery"
+)]
 pub async fn genre(
     ctx: Context<'_>,
     #[description = "Genre to filter by"]

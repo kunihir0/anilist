@@ -6,7 +6,12 @@ use crate::{
 use poise::{ChoiceParameter, CreateReply};
 
 /// Get a random well-rated anime or manga from AniList.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    user_cooldown = 5,
+    category = "Discovery"
+)]
 pub async fn random(
     ctx: Context<'_>,
     #[description = "Anime or Manga"] media_type: Option<MediaType>,

@@ -17,7 +17,12 @@ async fn autocomplete_genre(ctx: Context<'_>, partial: &str) -> impl Iterator<It
 }
 
 /// Advanced search/filter for media.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    user_cooldown = 5,
+    category = "Discovery"
+)]
 pub async fn filter(
     ctx: Context<'_>,
     #[description = "Media type (ANIME or MANGA)"] media_type: Option<MediaType>,

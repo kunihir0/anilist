@@ -42,7 +42,7 @@ pub fn media_embed(
         .unwrap_or_else(|| "N/A".to_string());
     let status = media.status.as_deref().unwrap_or("Unknown");
     let format = media.format.as_deref().unwrap_or("Unknown");
-    let title = media.title.get_title(lang);
+    let title = media.title.get_title(lang.clone());
 
     let mut embed = CreateEmbed::new()
         .title(title)
@@ -53,6 +53,7 @@ pub fn media_embed(
             "{media_type} • AniList ID {}",
             media.id
         )))
+        .timestamp(serenity::Timestamp::now())
         .field("Format", format, true)
         .field("Status", status, true)
         .field("Score", &score, true)
@@ -73,6 +74,25 @@ pub fn media_embed(
     if let Some(vol) = media.volumes {
         embed = embed.field("Volumes", vol.to_string(), true);
     }
+
+    // Compact relations preview (up to 3)
+    if let Some(relations) = &media.relations {
+        let preview: String = relations
+            .edges
+            .iter()
+            .take(3)
+            .map(|e| {
+                let r_type = e.relation_type.replace('_', " ");
+                let r_title = e.node.title.get_title(lang.clone());
+                format!("`{r_type}` [{}]({})", r_title, e.node.site_url)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        if !preview.is_empty() {
+            embed = embed.field("Related", &preview, false);
+        }
+    }
+
     if let Some(url) = &media.cover_image.as_ref().and_then(|c| c.large.as_ref()) {
         embed = embed.thumbnail(url.to_string());
     }
@@ -92,6 +112,7 @@ pub fn airing_page_embed(
     let mut embed = CreateEmbed::new()
         .title("Currently Airing")
         .colour(get_color(guild_color, TEAL))
+        .timestamp(serenity::Timestamp::now())
         .footer(serenity::CreateEmbedFooter::new(format!(
             "Page {page} of {total_pages}"
         )));
@@ -122,6 +143,7 @@ pub fn upcoming_page_embed(
     let mut embed = CreateEmbed::new()
         .title(format!("Upcoming — {season} {year}"))
         .colour(get_color(guild_color, PURPLE))
+        .timestamp(serenity::Timestamp::now())
         .footer(serenity::CreateEmbedFooter::new(format!(
             "Page {page} of {total_pages}"
         )));
@@ -187,6 +209,7 @@ pub fn character_embed(
         .url(&character.site_url)
         .description(&description)
         .colour(get_color(guild_color, PURPLE))
+        .timestamp(serenity::Timestamp::now())
         .footer(serenity::CreateEmbedFooter::new(format!(
             "AniList Character ID {}",
             character.id
@@ -241,6 +264,7 @@ pub fn studio_embed(
         .title(&studio.name)
         .url(&studio.site_url)
         .colour(get_color(guild_color, TEAL))
+        .timestamp(serenity::Timestamp::now())
         .footer(serenity::CreateEmbedFooter::new(format!(
             "{kind} • AniList ID {}",
             studio.id
@@ -292,6 +316,7 @@ pub fn staff_embed(
         .url(&staff.site_url)
         .description(&description)
         .colour(get_color(guild_color, PURPLE))
+        .timestamp(serenity::Timestamp::now())
         .footer(serenity::CreateEmbedFooter::new(format!(
             "AniList Staff ID {}",
             staff.id
@@ -313,6 +338,7 @@ pub fn staff_birthday_embed(staff_list: &[StaffBirthday], guild_color: Option<u3
     let mut embed = CreateEmbed::new()
         .title("🎂 Today's Staff Birthdays")
         .colour(get_color(guild_color, PURPLE))
+        .timestamp(serenity::Timestamp::now())
         .footer(serenity::CreateEmbedFooter::new("Powered by AniList"));
 
     if staff_list.is_empty() {
@@ -359,6 +385,7 @@ pub fn recommendations_embed(
             recs
         })
         .colour(get_color(guild_color, ANILIST_BLUE))
+        .timestamp(serenity::Timestamp::now())
 }
 
 // ─── Relations embed ─────────────────────────────────────────────────────────
@@ -372,7 +399,8 @@ pub fn relations_embed(
     let mut embed = CreateEmbed::new()
         .title(format!("Relations for {title}"))
         .url(&media.site_url)
-        .colour(get_color(guild_color, ANILIST_BLUE));
+        .colour(get_color(guild_color, ANILIST_BLUE))
+        .timestamp(serenity::Timestamp::now());
 
     if let Some(relations) = &media.relations {
         let list: String = relations
@@ -434,6 +462,7 @@ pub fn media_list_embed(
             list
         })
         .colour(get_color(guild_color, ANILIST_BLUE))
+        .timestamp(serenity::Timestamp::now())
 }
 
 // ─── Watchlist embed ─────────────────────────────────────────────────────────
@@ -447,7 +476,8 @@ pub fn watchlist_embed(
 ) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title(format!("{}'s {} Watchlist", username, media_type))
-        .colour(get_color(guild_color, ANILIST_BLUE));
+        .colour(get_color(guild_color, ANILIST_BLUE))
+        .timestamp(serenity::Timestamp::now());
 
     for list in &collection.lists {
         if list.entries.is_empty() {
@@ -486,7 +516,8 @@ pub fn favourites_embed(
     let mut embed = CreateEmbed::new()
         .title(format!("{}'s Favourites", user.name))
         .url(&user.site_url)
-        .colour(get_color(guild_color, ANILIST_BLUE));
+        .colour(get_color(guild_color, ANILIST_BLUE))
+        .timestamp(serenity::Timestamp::now());
 
     let anime: String = user
         .favourites
@@ -559,6 +590,7 @@ pub fn user_embed(user: &AniListUser, guild_color: Option<u32>) -> CreateEmbed {
         .url(&user.site_url)
         .description(&about)
         .colour(get_color(guild_color, ANILIST_BLUE))
+        .timestamp(serenity::Timestamp::now())
         .footer(serenity::CreateEmbedFooter::new(format!(
             "AniList User ID {}",
             user.id
@@ -621,6 +653,7 @@ pub fn compare_embed(u1: &AniListUser, u2: &AniListUser, guild_color: Option<u32
     CreateEmbed::new()
         .title(format!("{} vs {}", u1.name, u2.name))
         .colour(get_color(guild_color, ANILIST_BLUE))
+        .timestamp(serenity::Timestamp::now())
         .footer(serenity::CreateEmbedFooter::new(
             "AniList profile comparison",
         ))
@@ -641,7 +674,8 @@ pub fn compare_embed(u1: &AniListUser, u2: &AniListUser, guild_color: Option<u32
 pub fn server_list_embed(entries: &[ServerListEntry], guild_color: Option<u32>) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title("Server Anime List")
-        .colour(get_color(guild_color, TEAL));
+        .colour(get_color(guild_color, TEAL))
+        .timestamp(serenity::Timestamp::now());
 
     if entries.is_empty() {
         embed =
@@ -669,7 +703,8 @@ pub fn server_list_embed(entries: &[ServerListEntry], guild_color: Option<u32>) 
 pub fn leaderboard_embed(scores: &HashMap<u64, u32>, guild_color: Option<u32>) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title("Quiz Leaderboard")
-        .colour(get_color(guild_color, 0xFFA500));
+        .colour(get_color(guild_color, 0xFFA500))
+        .timestamp(serenity::Timestamp::now());
 
     if scores.is_empty() {
         embed = embed.description("No scores yet. Play with `/quiz`!");
@@ -693,6 +728,13 @@ pub fn leaderboard_embed(scores: &HashMap<u64, u32>, guild_color: Option<u32>) -
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 fn clean_html(input: &str) -> String {
+    // Convert <br> variants to newlines before stripping tags
+    let input = input
+        .replace("<br>", "\n")
+        .replace("<br/>", "\n")
+        .replace("<br />", "\n");
+
+    // Strip HTML tags
     let mut out = String::with_capacity(input.len());
     let mut in_tag = false;
     for ch in input.chars() {
@@ -703,7 +745,24 @@ fn clean_html(input: &str) -> String {
             _ => {}
         }
     }
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
+
+    // Decode common HTML entities
+    let out = out
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#039;", "'")
+        .replace("&apos;", "'")
+        .replace("&nbsp;", " ");
+
+    // Collapse excess whitespace while preserving intentional newlines
+    out.lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
 }
 
 fn truncate(s: &str, max: usize) -> String {

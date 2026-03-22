@@ -6,7 +6,12 @@ use crate::{
 use poise::CreateReply;
 
 /// Get relations (sequels, prequels, etc.) for a media title.
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    user_cooldown = 5,
+    category = "Discovery"
+)]
 pub async fn relations(
     ctx: Context<'_>,
     #[description = "Media title to look up relations for"] title: String,

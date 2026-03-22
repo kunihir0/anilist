@@ -39,7 +39,9 @@ impl From<ScheduleContentType> for ContentType {
     slash_command,
     prefix_command,
     subcommands("add", "remove", "list", "pause"),
-    guild_only
+    guild_only,
+    category = "Server",
+    default_member_permissions = "MANAGE_GUILD"
 )]
 pub async fn schedule(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
