@@ -1,11 +1,13 @@
 mod airing;
 mod character;
 mod compare;
+mod compare_media;
 mod favourites;
 mod filter;
 mod genre;
 mod help;
 mod leaderboard;
+mod notify;
 mod ping;
 mod prefs;
 mod profile;
@@ -18,13 +20,13 @@ pub mod schedule;
 mod serverlist;
 pub mod settings;
 mod staff;
+mod stats;
 mod studio;
+mod tag;
 mod trending;
 mod upcoming;
 mod watch;
 mod watchlist;
-mod tag;
-mod compare_media;
 
 use crate::models::bot_data::{Data, Error};
 
@@ -99,10 +101,16 @@ pub async fn anime(
         None
     };
 
-    match crate::api::anilist::fetch_anime(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
+    match crate::api::anilist::fetch_anime(
+        &data.http_client,
+        &data.cache,
+        &data.rate_limiter,
+        &title,
+    )
+    .await
+    {
         Ok(results) if results.is_empty() => {
-            ctx.say(format!("No Anime found for `{title}`."))
-                .await?;
+            ctx.say(format!("No Anime found for `{title}`.")).await?;
         }
         Ok(results) => {
             let pages: Vec<_> = results
@@ -113,6 +121,7 @@ pub async fn anime(
                         "Anime",
                         prefs.title_language.clone(),
                         accent_color,
+                        prefs.compact_mode,
                     );
                     (embed, m)
                 })
@@ -146,10 +155,16 @@ pub async fn manga(
         None
     };
 
-    match crate::api::anilist::fetch_manga(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
+    match crate::api::anilist::fetch_manga(
+        &data.http_client,
+        &data.cache,
+        &data.rate_limiter,
+        &title,
+    )
+    .await
+    {
         Ok(results) if results.is_empty() => {
-            ctx.say(format!("No Manga found for `{title}`."))
-                .await?;
+            ctx.say(format!("No Manga found for `{title}`.")).await?;
         }
         Ok(results) => {
             let pages: Vec<_> = results
@@ -160,6 +175,7 @@ pub async fn manga(
                         "Manga",
                         prefs.title_language.clone(),
                         accent_color,
+                        prefs.compact_mode,
                     );
                     (embed, m)
                 })
@@ -206,5 +222,7 @@ pub fn all() -> Vec<poise::Command<Data, Error>> {
         ping::ping(),
         tag::tag(),
         compare_media::compare_media(),
+        notify::notify(),
+        stats::stats(),
     ]
 }

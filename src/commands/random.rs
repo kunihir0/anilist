@@ -28,13 +28,14 @@ pub async fn random(
 
     let kind = media_type.unwrap_or(MediaType::Anime);
 
-    match fetch_random(&data.http_client, &data.rate_limiter, kind.as_str()).await {
+    match fetch_random(&data.http_client, &data.rate_limiter, kind.as_str(), None).await {
         Ok(media) => {
             ctx.send(CreateReply::default().embed(media_embed(
                 &media,
                 kind.name(),
                 prefs.title_language,
                 accent_color,
+                prefs.compact_mode,
             )))
             .await?;
         }

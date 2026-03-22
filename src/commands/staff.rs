@@ -1,7 +1,10 @@
 use crate::{
     api::anilist::{fetch_staff, fetch_staff_birthdays},
     models::bot_data::{Context, Error},
-    utils::{embeds::{staff_birthday_embed, staff_embed}, errors::reply_error},
+    utils::{
+        embeds::{staff_birthday_embed, staff_embed},
+        errors::reply_error,
+    },
 };
 use poise::CreateReply;
 
@@ -24,10 +27,7 @@ async fn autocomplete_staff(
             .into_iter()
             .map(|s| {
                 let name = s.name.full.unwrap_or_else(|| "Unknown".to_string());
-                poise::serenity_prelude::AutocompleteChoice::new(
-                    name.clone(),
-                    name,
-                )
+                poise::serenity_prelude::AutocompleteChoice::new(name.clone(), name)
             })
             .collect::<Vec<_>>()
             .into_iter(),

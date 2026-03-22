@@ -8,8 +8,7 @@ use poise::{ChoiceParameter, CreateReply};
 async fn autocomplete_tag(ctx: Context<'_>, partial: &str) -> impl Iterator<Item = String> {
     let tags = ctx.data().tags_cache.read().await;
     let partial = partial.to_lowercase();
-    tags
-        .iter()
+    tags.iter()
         .filter(move |t| t.to_lowercase().contains(&partial))
         .cloned()
         .collect::<Vec<_>>()

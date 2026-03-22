@@ -5,7 +5,7 @@ use crate::store::TitleLanguage;
 #[poise::command(
     slash_command,
     prefix_command,
-    subcommands("title_language"),
+    subcommands("title_language", "compact_mode"),
     category = "Utility"
 )]
 pub async fn prefs(_ctx: Context<'_>) -> Result<(), Error> {
@@ -29,5 +29,24 @@ pub async fn title_language(
         language
     ))
     .await?;
+    Ok(())
+}
+
+/// Toggle compact embed mode.
+#[poise::command(slash_command, prefix_command)]
+pub async fn compact_mode(
+    ctx: Context<'_>,
+    #[description = "Enable compact mode?"] enable: Option<bool>,
+) -> Result<(), Error> {
+    let user_id = ctx.author().id.get();
+    let old_prefs = ctx.data().store.get_user_prefs(user_id).await;
+
+    let new_mode = enable.unwrap_or(!old_prefs.compact_mode);
+
+    ctx.data().store.set_compact_mode(user_id, new_mode).await?;
+
+    let state_str = if new_mode { "enabled" } else { "disabled" };
+    ctx.say(format!("Compact mode has been **{}**.", state_str))
+        .await?;
     Ok(())
 }

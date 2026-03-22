@@ -156,6 +156,7 @@ async fn main() {
                     scheduler: scheduler.clone(),
                     genres: genres_cache,
                     tags_cache,
+                    start_time: std::time::Instant::now(),
                 };
 
                 tasks::presence::spawn(ctx.clone());

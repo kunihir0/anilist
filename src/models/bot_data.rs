@@ -22,6 +22,8 @@ pub struct Data {
     pub genres: Arc<RwLock<Vec<String>>>,
     /// Cached tags for autocomplete.
     pub tags_cache: Arc<RwLock<Vec<String>>>,
+    /// Bot start time for uptime tracking.
+    pub start_time: std::time::Instant,
 }
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────

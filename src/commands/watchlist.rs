@@ -1,9 +1,9 @@
 use crate::{
     api::anilist::fetch_watchlist,
     models::bot_data::{Context, Error, MediaType},
-    utils::{embeds::watchlist_embed, errors::reply_error},
+    utils::{embeds::watchlist_embeds, errors::reply_error, pagination::paginate},
 };
-use poise::{ChoiceParameter, CreateReply};
+use poise::ChoiceParameter;
 
 /// Look up a user's media watchlist collection.
 #[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Social")]
@@ -34,14 +34,14 @@ pub async fn watchlist(
     .await
     {
         Ok(collection) => {
-            ctx.send(CreateReply::default().embed(watchlist_embed(
+            let pages = watchlist_embeds(
                 &collection,
                 &username,
                 kind.name(),
                 prefs.title_language,
                 accent_color,
-            )))
-            .await?;
+            );
+            paginate(ctx, pages).await?;
         }
         Err(e) => {
             tracing::warn!("Watchlist fetch failed for {username:?}: {e}");

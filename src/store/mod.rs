@@ -11,7 +11,14 @@ pub struct GuildSettings {
     #[serde(default)]
     pub server_list: Vec<ServerListEntry>,
     #[serde(default)]
-    pub quiz_scores: HashMap<u64, u32>,
+    pub quiz_scores: HashMap<u64, QuizScoreInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct QuizScoreInfo {
+    pub score: u32,
+    pub current_streak: u32,
+    pub best_streak: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +40,8 @@ pub struct WatchParty {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UserPrefs {
     pub title_language: Option<TitleLanguage>,
+    #[serde(default)]
+    pub compact_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, poise::ChoiceParameter, PartialEq, Eq)]
@@ -120,6 +129,16 @@ pub struct ScheduleEntry {
     pub cron_expression: String,
     pub timezone: String,
     pub active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiringSubscription {
+    pub id: String,
+    pub user_id: u64,
+    pub guild_id: Option<u64>,
+    pub channel_id: Option<u64>,
+    pub media_id: u64,
+    pub title: String,
 }
 
 pub struct Store {
@@ -223,7 +242,7 @@ impl Store {
         }
 
         // Fetch quiz scores
-        if let Ok(rows) = sqlx::query("SELECT user_id, score FROM quiz_scores WHERE guild_id = ?")
+        if let Ok(rows) = sqlx::query("SELECT user_id, score, current_streak, best_streak FROM quiz_scores WHERE guild_id = ?")
             .bind(g_id)
             .fetch_all(&self.pool)
             .await
@@ -233,7 +252,11 @@ impl Store {
                 .map(|r| {
                     (
                         r.get::<i64, _>("user_id") as u64,
-                        r.get::<i64, _>("score") as u32,
+                        QuizScoreInfo {
+                            score: r.get::<i64, _>("score") as u32,
+                            current_streak: r.try_get::<i64, _>("current_streak").unwrap_or(0) as u32,
+                            best_streak: r.try_get::<i64, _>("best_streak").unwrap_or(0) as u32,
+                        },
                     )
                 })
                 .collect();
@@ -313,6 +336,7 @@ impl Store {
         &self,
         guild_id: u64,
         user_id: u64,
+        streak_broken: bool,
     ) -> Result<(), sqlx::Error> {
         let g_id = guild_id as i64;
         let u_id = user_id as i64;
@@ -325,14 +349,28 @@ impl Store {
         .execute(&self.pool)
         .await?;
 
-        sqlx::query(
-            "INSERT INTO quiz_scores (guild_id, user_id, score) VALUES (?, ?, 1)
-             ON CONFLICT(guild_id, user_id) DO UPDATE SET score = score + 1",
-        )
-        .bind(g_id)
-        .bind(u_id)
-        .execute(&self.pool)
-        .await?;
+        if streak_broken {
+            sqlx::query(
+                "INSERT INTO quiz_scores (guild_id, user_id, score, current_streak, best_streak) VALUES (?, ?, 0, 0, 0)
+                 ON CONFLICT(guild_id, user_id) DO UPDATE SET current_streak = 0",
+            )
+            .bind(g_id)
+            .bind(u_id)
+            .execute(&self.pool)
+            .await?;
+        } else {
+            sqlx::query(
+                "INSERT INTO quiz_scores (guild_id, user_id, score, current_streak, best_streak) VALUES (?, ?, 1, 1, 1)
+                 ON CONFLICT(guild_id, user_id) DO UPDATE SET 
+                 score = score + 1,
+                 current_streak = current_streak + 1,
+                 best_streak = MAX(best_streak, current_streak + 1)",
+            )
+            .bind(g_id)
+            .bind(u_id)
+            .execute(&self.pool)
+            .await?;
+        }
         Ok(())
     }
 
@@ -443,18 +481,37 @@ impl Store {
     pub async fn get_user_prefs(&self, user_id: u64) -> UserPrefs {
         let u_id = user_id as i64;
         if let Ok(Some(row)) =
-            sqlx::query("SELECT title_language FROM user_prefs WHERE user_id = ?")
+            sqlx::query("SELECT title_language, compact_mode FROM user_prefs WHERE user_id = ?")
                 .bind(u_id)
                 .fetch_optional(&self.pool)
                 .await
         {
             let lang_str: Option<String> = row.try_get("title_language").unwrap_or_default();
+            let compact_mode: bool = row.try_get("compact_mode").unwrap_or(false);
             UserPrefs {
                 title_language: lang_str.and_then(|s| TitleLanguage::from_str(&s).ok()),
+                compact_mode,
             }
         } else {
             UserPrefs::default()
         }
+    }
+
+    pub async fn set_compact_mode(
+        &self,
+        user_id: u64,
+        compact_mode: bool,
+    ) -> Result<(), sqlx::Error> {
+        let u_id = user_id as i64;
+        sqlx::query(
+            "INSERT INTO user_prefs (user_id, compact_mode) VALUES (?, ?)
+             ON CONFLICT(user_id) DO UPDATE SET compact_mode = excluded.compact_mode",
+        )
+        .bind(u_id)
+        .bind(compact_mode)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn set_title_language(
@@ -473,5 +530,94 @@ impl Store {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    pub async fn add_airing_subscription(
+        &self,
+        sub: AiringSubscription,
+    ) -> Result<(), sqlx::Error> {
+        let g_id = sub.guild_id.map(|id| id as i64);
+        let c_id = sub.channel_id.map(|id| id as i64);
+
+        sqlx::query(
+            "INSERT INTO airing_subscriptions (id, user_id, guild_id, channel_id, media_id, title)
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&sub.id)
+        .bind(sub.user_id as i64)
+        .bind(g_id)
+        .bind(c_id)
+        .bind(sub.media_id as i64)
+        .bind(&sub.title)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn remove_airing_subscription(
+        &self,
+        user_id: u64,
+        media_id: u64,
+        channel_id: Option<u64>,
+    ) -> Result<bool, sqlx::Error> {
+        let u_id = user_id as i64;
+        let m_id = media_id as i64;
+        let c_id = channel_id.map(|id| id as i64);
+
+        let query = if c_id.is_some() {
+            "DELETE FROM airing_subscriptions WHERE user_id = ? AND media_id = ? AND channel_id = ?"
+        } else {
+            "DELETE FROM airing_subscriptions WHERE user_id = ? AND media_id = ? AND channel_id IS NULL"
+        };
+
+        let mut q = sqlx::query(query).bind(u_id).bind(m_id);
+        if let Some(cid) = c_id {
+            q = q.bind(cid);
+        }
+
+        let result = q.execute(&self.pool).await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn get_user_subscriptions(&self, user_id: u64) -> Vec<AiringSubscription> {
+        let u_id = user_id as i64;
+        if let Ok(rows) = sqlx::query("SELECT id, guild_id, channel_id, media_id, title FROM airing_subscriptions WHERE user_id = ?")
+            .bind(u_id)
+            .fetch_all(&self.pool)
+            .await
+        {
+            rows.into_iter().map(|r| AiringSubscription {
+                id: r.get("id"),
+                user_id,
+                guild_id: r.get::<Option<i64>, _>("guild_id").map(|id| id as u64),
+                channel_id: r.get::<Option<i64>, _>("channel_id").map(|id| id as u64),
+                media_id: r.get::<i64, _>("media_id") as u64,
+                title: r.get("title"),
+            }).collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub async fn get_all_airing_subscriptions(&self) -> Vec<AiringSubscription> {
+        if let Ok(rows) = sqlx::query(
+            "SELECT id, user_id, guild_id, channel_id, media_id, title FROM airing_subscriptions",
+        )
+        .fetch_all(&self.pool)
+        .await
+        {
+            rows.into_iter()
+                .map(|r| AiringSubscription {
+                    id: r.get("id"),
+                    user_id: r.get::<i64, _>("user_id") as u64,
+                    guild_id: r.get::<Option<i64>, _>("guild_id").map(|id| id as u64),
+                    channel_id: r.get::<Option<i64>, _>("channel_id").map(|id| id as u64),
+                    media_id: r.get::<i64, _>("media_id") as u64,
+                    title: r.get("title"),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
     }
 }

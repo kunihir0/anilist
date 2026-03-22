@@ -22,10 +22,7 @@ async fn autocomplete_studio(
     {
         Ok(items) => items
             .into_iter()
-            .map(|s| poise::serenity_prelude::AutocompleteChoice::new(
-                s.name.clone(),
-                s.name,
-            ))
+            .map(|s| poise::serenity_prelude::AutocompleteChoice::new(s.name.clone(), s.name))
             .collect::<Vec<_>>()
             .into_iter(),
         Err(_) => Vec::new().into_iter(),

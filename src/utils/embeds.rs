@@ -22,6 +22,7 @@ pub fn media_embed(
     media_type: &str,
     lang: Option<TitleLanguage>,
     guild_color: Option<u32>,
+    compact: bool,
 ) -> CreateEmbed {
     let description = media
         .description
@@ -47,50 +48,64 @@ pub fn media_embed(
     let mut embed = CreateEmbed::new()
         .title(title)
         .url(&media.site_url)
-        .description(&description)
         .colour(get_color(guild_color, ANILIST_BLUE))
         .footer(serenity::CreateEmbedFooter::new(format!(
             "{media_type} • AniList ID {}",
             media.id
         )))
-        .timestamp(serenity::Timestamp::now())
-        .field("Format", format, true)
-        .field("Status", status, true)
-        .field("Score", &score, true)
-        .field("Genres", &genres, false);
+        .timestamp(serenity::Timestamp::now());
 
-    if let Some(date) = &media.start_date {
-        embed = embed.field("Start Date", date.display(), true);
-    }
-    if let Some(eps) = media.episodes {
-        embed = embed.field("Episodes", eps.to_string(), true);
-    }
-    if let (Some(season), Some(year)) = (&media.season, media.season_year) {
-        embed = embed.field("Season", format!("{season} {year}"), true);
-    }
-    if let Some(ch) = media.chapters {
-        embed = embed.field("Chapters", ch.to_string(), true);
-    }
-    if let Some(vol) = media.volumes {
-        embed = embed.field("Volumes", vol.to_string(), true);
-    }
+    if !compact {
+        embed = embed
+            .description(&description)
+            .field("Format", format, true)
+            .field("Status", status, true)
+            .field("Score", &score, true)
+            .field("Genres", &genres, false);
 
-    // Compact relations preview (up to 3)
-    if let Some(relations) = &media.relations {
-        let preview: String = relations
-            .edges
-            .iter()
-            .take(3)
-            .map(|e| {
-                let r_type = e.relation_type.replace('_', " ");
-                let r_title = e.node.title.get_title(lang.clone());
-                format!("`{r_type}` [{}]({})", r_title, e.node.site_url)
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        if !preview.is_empty() {
-            embed = embed.field("Related", &preview, false);
+        if let Some(date) = &media.start_date {
+            embed = embed.field("Start Date", date.display(), true);
         }
+        if let Some(eps) = media.episodes {
+            embed = embed.field("Episodes", eps.to_string(), true);
+        }
+        if let (Some(season), Some(year)) = (&media.season, media.season_year) {
+            embed = embed.field("Season", format!("{season} {year}"), true);
+        }
+        if let Some(ch) = media.chapters {
+            embed = embed.field("Chapters", ch.to_string(), true);
+        }
+        if let Some(vol) = media.volumes {
+            embed = embed.field("Volumes", vol.to_string(), true);
+        }
+
+        // Compact relations preview (up to 3)
+        if let Some(relations) = &media.relations {
+            let preview: String = relations
+                .edges
+                .iter()
+                .take(3)
+                .map(|e| {
+                    let r_type = e.relation_type.replace('_', " ");
+                    let r_title = e.node.title.get_title(lang.clone());
+                    format!("`{r_type}` [{}]({})", r_title, e.node.site_url)
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            if !preview.is_empty() {
+                embed = embed.field("Related", &preview, false);
+            }
+        }
+    } else {
+        let eps_str = media
+            .episodes
+            .or(media.chapters)
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "?".to_string());
+        embed = embed.description(format!(
+            "**Format:** {} • **Status:** {} • **Score:** {}\n**Ep/Ch:** {} • **Genres:** {}",
+            format, status, score, eps_str, genres
+        ));
     }
 
     if let Some(url) = &media.cover_image.as_ref().and_then(|c| c.large.as_ref()) {
@@ -474,107 +489,159 @@ pub fn media_list_embed(
 
 // ─── Watchlist embed ─────────────────────────────────────────────────────────
 
-pub fn watchlist_embed(
+pub fn watchlist_embeds(
     collection: &MediaListCollection,
     username: &str,
     media_type: &str,
     lang: Option<TitleLanguage>,
     guild_color: Option<u32>,
-) -> CreateEmbed {
-    let mut embed = CreateEmbed::new()
-        .title(format!("{}'s {} Watchlist", username, media_type))
-        .colour(get_color(guild_color, ANILIST_BLUE))
-        .timestamp(serenity::Timestamp::now());
-
+) -> Vec<CreateEmbed> {
+    let mut flat_entries = Vec::new();
     for list in &collection.lists {
-        if list.entries.is_empty() {
-            continue;
+        for entry in &list.entries {
+            flat_entries.push((list.name.clone(), entry));
         }
+    }
 
-        let entries: String = list
-            .entries
-            .iter()
-            .take(10)
-            .map(|e| {
-                let title = e.media.title.get_title(lang.clone());
-                let score = if e.score > 0.0 {
-                    format!(" ({}/100)", e.score)
+    if flat_entries.is_empty() {
+        return vec![
+            CreateEmbed::new()
+                .title(format!("{}'s {} Watchlist", username, media_type))
+                .description("No entries found.")
+                .colour(get_color(guild_color, ANILIST_BLUE))
+                .timestamp(serenity::Timestamp::now()),
+        ];
+    }
+
+    let chunks: Vec<_> = flat_entries.chunks(10).collect();
+    let total_pages = chunks.len();
+
+    chunks
+        .iter()
+        .enumerate()
+        .map(|(page_idx, chunk)| {
+            let mut embed = CreateEmbed::new()
+                .title(format!("{}'s {} Watchlist", username, media_type))
+                .colour(get_color(guild_color, ANILIST_BLUE))
+                .timestamp(serenity::Timestamp::now())
+                .footer(serenity::CreateEmbedFooter::new(format!(
+                    "Page {} of {}",
+                    page_idx + 1,
+                    total_pages
+                )));
+
+            let mut current_list = String::new();
+            let mut entries_str = String::new();
+
+            for (list_name, entry) in *chunk {
+                if list_name != &current_list {
+                    if !entries_str.is_empty() {
+                        embed = embed.field(&current_list, &entries_str, false);
+                    }
+                    current_list = list_name.clone();
+                    entries_str.clear();
+                }
+
+                let title = entry.media.title.get_title(lang.clone());
+                let score = if entry.score > 0.0 {
+                    format!(" ({}/100)", entry.score)
                 } else {
                     "".to_string()
                 };
-                format!("[{}]({}){}", title, e.media.site_url, score)
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
+                entries_str.push_str(&format!(
+                    "• [{}]({}){}\n",
+                    title, entry.media.site_url, score
+                ));
+            }
 
-        embed = embed.field(&list.name, entries, false);
-    }
+            if !entries_str.is_empty() {
+                embed = embed.field(&current_list, &entries_str, false);
+            }
 
-    embed
+            embed
+        })
+        .collect()
 }
 
 // ─── Favourites embed ────────────────────────────────────────────────────────
 
-pub fn favourites_embed(
+pub fn favourites_embeds(
     user: &UserFavourites,
     lang: Option<TitleLanguage>,
     guild_color: Option<u32>,
-) -> CreateEmbed {
-    let mut embed = CreateEmbed::new()
-        .title(format!("{}'s Favourites", user.name))
-        .url(&user.site_url)
-        .colour(get_color(guild_color, ANILIST_BLUE))
-        .timestamp(serenity::Timestamp::now());
+) -> Vec<CreateEmbed> {
+    let mut flat = Vec::new();
 
-    let anime: String = user
-        .favourites
-        .anime
-        .nodes
-        .iter()
-        .map(|n| format!("[{}]({})", n.title.get_title(lang.clone()), n.site_url))
-        .collect::<Vec<_>>()
-        .join("\n");
-    if !anime.is_empty() {
-        embed = embed.field("Anime", anime, true);
+    for n in &user.favourites.anime.nodes {
+        flat.push((
+            "Anime",
+            format!("[{}]({})", n.title.get_title(lang.clone()), n.site_url),
+        ));
+    }
+    for n in &user.favourites.manga.nodes {
+        flat.push((
+            "Manga",
+            format!("[{}]({})", n.title.get_title(lang.clone()), n.site_url),
+        ));
+    }
+    for n in &user.favourites.characters.nodes {
+        flat.push((
+            "Characters",
+            format!("[{}]({})", n.name.preferred(), n.site_url),
+        ));
+    }
+    for n in &user.favourites.studios.nodes {
+        flat.push(("Studios", format!("[{}]({})", n.name, n.site_url)));
     }
 
-    let manga: String = user
-        .favourites
-        .manga
-        .nodes
-        .iter()
-        .map(|n| format!("[{}]({})", n.title.get_title(lang.clone()), n.site_url))
-        .collect::<Vec<_>>()
-        .join("\n");
-    if !manga.is_empty() {
-        embed = embed.field("Manga", manga, true);
+    if flat.is_empty() {
+        return vec![
+            CreateEmbed::new()
+                .title(format!("{}'s Favourites", user.name))
+                .url(&user.site_url)
+                .description("No favourites found.")
+                .colour(get_color(guild_color, ANILIST_BLUE))
+                .timestamp(serenity::Timestamp::now()),
+        ];
     }
 
-    let characters: String = user
-        .favourites
-        .characters
-        .nodes
-        .iter()
-        .map(|n| format!("[{}]({})", n.name.preferred(), n.site_url))
-        .collect::<Vec<_>>()
-        .join("\n");
-    if !characters.is_empty() {
-        embed = embed.field("Characters", characters, true);
-    }
+    let chunks: Vec<_> = flat.chunks(10).collect();
+    let total_pages = chunks.len();
 
-    let studios: String = user
-        .favourites
-        .studios
-        .nodes
+    chunks
         .iter()
-        .map(|n| format!("[{}]({})", n.name, n.site_url))
-        .collect::<Vec<_>>()
-        .join("\n");
-    if !studios.is_empty() {
-        embed = embed.field("Studios", studios, true);
-    }
+        .enumerate()
+        .map(|(page_idx, chunk)| {
+            let mut embed = CreateEmbed::new()
+                .title(format!("{}'s Favourites", user.name))
+                .url(&user.site_url)
+                .colour(get_color(guild_color, ANILIST_BLUE))
+                .timestamp(serenity::Timestamp::now())
+                .footer(serenity::CreateEmbedFooter::new(format!(
+                    "Page {} of {}",
+                    page_idx + 1,
+                    total_pages
+                )));
 
-    embed
+            let mut current_cat = String::new();
+            let mut entries_str = String::new();
+
+            for (cat, line) in *chunk {
+                if cat != &current_cat {
+                    if !entries_str.is_empty() {
+                        embed = embed.field(&current_cat, &entries_str, false);
+                    }
+                    current_cat = cat.to_string();
+                    entries_str.clear();
+                }
+                entries_str.push_str(&format!("• {}\n", line));
+            }
+            if !entries_str.is_empty() {
+                embed = embed.field(&current_cat, &entries_str, false);
+            }
+            embed
+        })
+        .collect()
 }
 
 // ─── User profile embed ───────────────────────────────────────────────────────
@@ -687,29 +754,51 @@ pub fn media_compare_embed(
     let t1 = m1.title.get_title(lang.clone());
     let t2 = m2.title.get_title(lang.clone());
 
-    let s1 = m1.average_score.map(|s| format!("{s}%")).unwrap_or_else(|| "N/A".to_string());
-    let s2 = m2.average_score.map(|s| format!("{s}%")).unwrap_or_else(|| "N/A".to_string());
-    
-    let e1 = m1.episodes.or(m1.chapters).map(|e| e.to_string()).unwrap_or_else(|| "?".to_string());
-    let e2 = m2.episodes.or(m2.chapters).map(|e| e.to_string()).unwrap_or_else(|| "?".to_string());
-    
+    let s1 = m1
+        .average_score
+        .map(|s| format!("{s}%"))
+        .unwrap_or_else(|| "N/A".to_string());
+    let s2 = m2
+        .average_score
+        .map(|s| format!("{s}%"))
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let e1 = m1
+        .episodes
+        .or(m1.chapters)
+        .map(|e| e.to_string())
+        .unwrap_or_else(|| "?".to_string());
+    let e2 = m2
+        .episodes
+        .or(m2.chapters)
+        .map(|e| e.to_string())
+        .unwrap_or_else(|| "?".to_string());
+
     let f1 = m1.format.as_deref().unwrap_or("?");
     let f2 = m2.format.as_deref().unwrap_or("?");
 
     let stat1 = format!(
         "[AniList Page]({})\n**Score:** {}\n**Ep/Ch:** {}\n**Format:** {}\n**Status:** {}\n**Season:** {}",
         m1.site_url,
-        s1, e1, f1,
+        s1,
+        e1,
+        f1,
         m1.status.as_deref().unwrap_or("?"),
-        m1.season_year.map(|y| format!("{} {}", m1.season.as_deref().unwrap_or(""), y)).unwrap_or_else(|| "N/A".to_string()),
+        m1.season_year
+            .map(|y| format!("{} {}", m1.season.as_deref().unwrap_or(""), y))
+            .unwrap_or_else(|| "N/A".to_string()),
     );
 
     let stat2 = format!(
         "[AniList Page]({})\n**Score:** {}\n**Ep/Ch:** {}\n**Format:** {}\n**Status:** {}\n**Season:** {}",
         m2.site_url,
-        s2, e2, f2,
+        s2,
+        e2,
+        f2,
         m2.status.as_deref().unwrap_or("?"),
-        m2.season_year.map(|y| format!("{} {}", m2.season.as_deref().unwrap_or(""), y)).unwrap_or_else(|| "N/A".to_string()),
+        m2.season_year
+            .map(|y| format!("{} {}", m2.season.as_deref().unwrap_or(""), y))
+            .unwrap_or_else(|| "N/A".to_string()),
     );
 
     CreateEmbed::new()
@@ -751,7 +840,10 @@ pub fn server_list_embed(entries: &[ServerListEntry], guild_color: Option<u32>) 
 
 // ─── Leaderboard embed ────────────────────────────────────────────────────────
 
-pub fn leaderboard_embed(scores: &HashMap<u64, u32>, guild_color: Option<u32>) -> CreateEmbed {
+pub fn leaderboard_embed(
+    scores: &HashMap<u64, crate::store::QuizScoreInfo>,
+    guild_color: Option<u32>,
+) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .title("Quiz Leaderboard")
         .colour(get_color(guild_color, 0xFFA500))
@@ -761,13 +853,22 @@ pub fn leaderboard_embed(scores: &HashMap<u64, u32>, guild_color: Option<u32>) -
         embed = embed.description("No scores yet. Play with `/quiz`!");
     } else {
         let mut sorted: Vec<_> = scores.iter().collect();
-        sorted.sort_by(|a, b| b.1.cmp(a.1));
+        sorted.sort_by(|a, b| b.1.score.cmp(&a.1.score));
 
         let list: String = sorted
             .iter()
             .enumerate()
             .take(10)
-            .map(|(i, (id, score))| format!("{}. <@{}> — **{}** wins", i + 1, id, score))
+            .map(|(i, (id, info))| {
+                format!(
+                    "{}. <@{}> — **{}** wins (Streak: {} | Best: {})",
+                    i + 1,
+                    id,
+                    info.score,
+                    info.current_streak,
+                    info.best_streak
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n");
         embed = embed.description(list);

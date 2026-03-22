@@ -49,7 +49,8 @@ pub async fn airing(
                 shows.retain(|show| {
                     if let Some(ep) = &show.next_airing_episode {
                         // AniList provides airing_at in seconds UTC
-                        if let chrono::LocalResult::Single(dt) = Utc.timestamp_opt(ep.airing_at, 0) {
+                        if let chrono::LocalResult::Single(dt) = Utc.timestamp_opt(ep.airing_at, 0)
+                        {
                             return dt.weekday() == target;
                         }
                     }
@@ -59,7 +60,8 @@ pub async fn airing(
 
             if shows.is_empty() {
                 if let Some(ref d) = day {
-                    ctx.say(format!("No currently airing anime found for `{}`.", d)).await?;
+                    ctx.say(format!("No currently airing anime found for `{}`.", d))
+                        .await?;
                 } else {
                     ctx.say("No currently airing anime found.").await?;
                 }

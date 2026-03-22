@@ -174,7 +174,8 @@ pub async fn paginate_media(
             CreateReply::default()
                 .embed(pages[index].0.clone())
                 .components(vec![media_interactive_row()]),
-        ).await?
+        )
+        .await?
     };
 
     let message = reply.into_message().await?;
@@ -230,7 +231,9 @@ pub async fn paginate_media(
                         interaction
                             .create_followup(
                                 ctx.serenity_context(),
-                                CreateInteractionResponseFollowup::new().embed(e).ephemeral(true),
+                                CreateInteractionResponseFollowup::new()
+                                    .embed(e)
+                                    .ephemeral(true),
                             )
                             .await?;
                     }
@@ -266,7 +269,9 @@ pub async fn paginate_media(
                     .create_response(
                         ctx.serenity_context(),
                         CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new().embed(e).ephemeral(true),
+                            CreateInteractionResponseMessage::new()
+                                .embed(e)
+                                .ephemeral(true),
                         ),
                     )
                     .await?;
@@ -309,7 +314,9 @@ pub async fn paginate_media(
                         interaction
                             .create_followup(
                                 ctx.serenity_context(),
-                                CreateInteractionResponseFollowup::new().embed(e).ephemeral(true),
+                                CreateInteractionResponseFollowup::new()
+                                    .embed(e)
+                                    .ephemeral(true),
                             )
                             .await?;
                     }
@@ -352,13 +359,20 @@ pub async fn paginate_media(
         disable_components.push(disabled_row(index, total));
     }
     // Also disable media interactive buttons if we want, or just remove them
-    disable_components.push(
-        CreateActionRow::Buttons(vec![
-            CreateButton::new("media_characters").label("👥 Characters").style(ButtonStyle::Secondary).disabled(true),
-            CreateButton::new("media_relations").label("🔗 Relations").style(ButtonStyle::Secondary).disabled(true),
-            CreateButton::new("media_recommendations").label("⭐ Recommendations").style(ButtonStyle::Secondary).disabled(true),
-        ])
-    );
+    disable_components.push(CreateActionRow::Buttons(vec![
+        CreateButton::new("media_characters")
+            .label("👥 Characters")
+            .style(ButtonStyle::Secondary)
+            .disabled(true),
+        CreateButton::new("media_relations")
+            .label("🔗 Relations")
+            .style(ButtonStyle::Secondary)
+            .disabled(true),
+        CreateButton::new("media_recommendations")
+            .label("⭐ Recommendations")
+            .style(ButtonStyle::Secondary)
+            .disabled(true),
+    ]));
 
     message
         .clone()

@@ -24,10 +24,7 @@ async fn autocomplete_character(
             .into_iter()
             .map(|c| {
                 let name = c.name.full.unwrap_or_else(|| "Unknown".to_string());
-                poise::serenity_prelude::AutocompleteChoice::new(
-                    name.clone(),
-                    name,
-                )
+                poise::serenity_prelude::AutocompleteChoice::new(name.clone(), name)
             })
             .collect::<Vec<_>>()
             .into_iter(),

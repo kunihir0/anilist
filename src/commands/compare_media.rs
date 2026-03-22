@@ -7,7 +7,12 @@ use crate::{
 use poise::CreateReply;
 
 /// Compare two media items (anime/manga) side by side.
-#[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Discovery")]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    user_cooldown = 5,
+    category = "Discovery"
+)]
 pub async fn compare_media(
     ctx: Context<'_>,
     #[description = "First title"]
@@ -35,14 +40,22 @@ pub async fn compare_media(
     // Prepare async fetches based on types
     let f1 = async {
         match kind1 {
-            MediaType::Anime => fetch_anime(&data.http_client, &data.cache, &data.rate_limiter, &title1).await,
-            MediaType::Manga => fetch_manga(&data.http_client, &data.cache, &data.rate_limiter, &title1).await,
+            MediaType::Anime => {
+                fetch_anime(&data.http_client, &data.cache, &data.rate_limiter, &title1).await
+            }
+            MediaType::Manga => {
+                fetch_manga(&data.http_client, &data.cache, &data.rate_limiter, &title1).await
+            }
         }
     };
     let f2 = async {
         match kind2 {
-            MediaType::Anime => fetch_anime(&data.http_client, &data.cache, &data.rate_limiter, &title2).await,
-            MediaType::Manga => fetch_manga(&data.http_client, &data.cache, &data.rate_limiter, &title2).await,
+            MediaType::Anime => {
+                fetch_anime(&data.http_client, &data.cache, &data.rate_limiter, &title2).await
+            }
+            MediaType::Manga => {
+                fetch_manga(&data.http_client, &data.cache, &data.rate_limiter, &title2).await
+            }
         }
     };
 

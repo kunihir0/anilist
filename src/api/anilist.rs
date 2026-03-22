@@ -319,8 +319,9 @@ pub async fn fetch_random(
     client: &Client,
     rate_limiter: &RateLimiter,
     media_type: &str,
+    page: Option<u32>,
 ) -> Result<Media, Error> {
-    let page = rand_page(100);
+    let page = page.unwrap_or_else(|| rand_page(100));
     let vars = json!({ "type": media_type, "page": page });
     let data: MediaSearchData =
         graphql_post(client, rate_limiter, queries::RANDOM_PAGE_QUERY, vars).await?;
@@ -464,7 +465,9 @@ pub async fn fetch_tags(
         "tags:all".to_string(),
         queries::TAG_COLLECTION_QUERY,
         json!({}),
-        |d: crate::models::responses::TagCollectionData| d.tags.into_iter().map(|t| t.name).collect(),
+        |d: crate::models::responses::TagCollectionData| {
+            d.tags.into_iter().map(|t| t.name).collect()
+        },
         Some(86400 * 7), // 1 week
     )
     .await

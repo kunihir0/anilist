@@ -26,6 +26,31 @@ pub async fn spawn_scheduler(ctx: serenity::Context, data: Arc<Data>) {
         }
     }
 
+    // Register airing notification checker (every 30 minutes)
+    {
+        let http = ctx.http.clone();
+        let data_clone = data.clone();
+
+        let job = Job::new_async("0 */30 * * * *", move |_uuid, _l| {
+            let http = http.clone();
+            let data = data_clone.clone();
+            Box::pin(async move {
+                if let Err(e) = check_airing_notifications(http, data).await {
+                    tracing::error!("Error checking airing notifications: {}", e);
+                }
+            })
+        });
+
+        match job {
+            Ok(j) => {
+                if let Err(e) = scheduler.add(j).await {
+                    tracing::error!("Failed to add airing notification job: {}", e);
+                }
+            }
+            Err(e) => tracing::error!("Failed to create airing notification job: {}", e),
+        }
+    }
+
     if let Err(e) = scheduler.start().await {
         tracing::error!("Failed to start scheduler: {}", e);
     }
@@ -67,15 +92,15 @@ async fn execute_job(
 
     match entry.content_type {
         ContentType::DailyAnime => {
-            let media = fetch_random(&data.http_client, &data.rate_limiter, "ANIME").await?;
-            let embed = media_embed(&media, "Anime", None, accent_color);
+            let media = fetch_random(&data.http_client, &data.rate_limiter, "ANIME", None).await?;
+            let embed = media_embed(&media, "Anime", None, accent_color, false);
             channel_id
                 .send_message(&http, serenity::CreateMessage::new().embed(embed))
                 .await?;
         }
         ContentType::DailyManga => {
-            let media = fetch_random(&data.http_client, &data.rate_limiter, "MANGA").await?;
-            let embed = media_embed(&media, "Manga", None, accent_color);
+            let media = fetch_random(&data.http_client, &data.rate_limiter, "MANGA", None).await?;
+            let embed = media_embed(&media, "Manga", None, accent_color, false);
             channel_id
                 .send_message(&http, serenity::CreateMessage::new().embed(embed))
                 .await?;
@@ -125,6 +150,60 @@ async fn execute_job(
                 channel_id
                     .send_message(&http, serenity::CreateMessage::new().embed(embed))
                     .await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn check_airing_notifications(
+    http: Arc<serenity::Http>,
+    data: Arc<Data>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let subs = data.store.get_all_airing_subscriptions().await;
+    if subs.is_empty() {
+        return Ok(());
+    }
+
+    // Fetch currently airing anime
+    let airing_shows = fetch_airing(&data.http_client, &data.cache, &data.rate_limiter).await?;
+
+    // Build a lookup: media_id -> NextAiringEpisode info
+    let mut airing_map = std::collections::HashMap::new();
+    for show in &airing_shows {
+        if let Some(ep) = &show.next_airing_episode {
+            // Notify if episode airs within the next 30 minutes (1800 seconds)
+            if ep.time_until_airing >= 0 && ep.time_until_airing <= 1800 {
+                airing_map.insert(show.id, (show, ep));
+            }
+        }
+    }
+
+    for sub in &subs {
+        if let Some((show, ep)) = airing_map.get(&sub.media_id) {
+            let title = &show.title.preferred();
+            let msg = format!(
+                "🔔 **{}** — Episode {} is airing in {}!",
+                title,
+                ep.episode,
+                ep.countdown()
+            );
+
+            if let Some(channel_id) = sub.channel_id {
+                let ch = ChannelId::new(channel_id);
+                let content = format!("<@{}> {}", sub.user_id, msg);
+                let _ = ch
+                    .send_message(&http, serenity::CreateMessage::new().content(content))
+                    .await;
+            } else {
+                // DM the user
+                let user = serenity::UserId::new(sub.user_id);
+                if let Ok(dm_ch) = user.create_dm_channel(&http).await {
+                    let _ = dm_ch
+                        .send_message(&http, serenity::CreateMessage::new().content(&msg))
+                        .await;
+                }
             }
         }
     }

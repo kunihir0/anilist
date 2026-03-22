@@ -72,6 +72,11 @@ impl Cache {
             self.inner.insert(key, entry).await;
         }
     }
+
+    /// Returns the approximate number of entries currently in the cache.
+    pub fn entry_count(&self) -> u64 {
+        self.inner.entry_count()
+    }
 }
 
 // ─── Basic Token Bucket Rate Limiter ──────────────────────────────────────────
