@@ -26,69 +26,150 @@ mod watchlist;
 
 use crate::models::bot_data::{Data, Error};
 
-macro_rules! make_search_command {
-    ($func_name:ident, $fetch_fn:path, $media_type:expr, $description:expr) => {
-        #[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Search")]
-        #[doc = $description]
-        pub async fn $func_name(
-            ctx: crate::models::bot_data::Context<'_>,
-            #[description = "Title to search for"] title: String,
-        ) -> Result<(), crate::models::bot_data::Error> {
-            ctx.defer().await?;
-            let data = ctx.data();
-            let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
-            let guild_id = ctx.guild_id().map(|id| id.get());
-            let accent_color = if let Some(gid) = guild_id {
-                data.store.get_settings(gid).await.accent_color
-            } else {
-                None
-            };
+// ─── Autocomplete handlers ───────────────────────────────────────────────────
 
-            match $fetch_fn(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
-                Ok(results) if results.is_empty() => {
-                    ctx.say(format!(
-                        "No {} found for `{title}`.",
-                        stringify!($func_name)
-                    ))
-                    .await?;
-                }
-                Ok(results) => {
-                    let pages: Vec<_> = results
-                        .iter()
-                        .map(|m| {
-                            crate::utils::embeds::media_embed(
-                                m,
-                                $media_type,
-                                prefs.title_language.clone(),
-                                accent_color,
-                            )
-                        })
-                        .collect();
-                    crate::utils::pagination::paginate(ctx, pages).await?;
-                }
-                Err(e) => {
-                    tracing::warn!("{} fetch failed for {title:?}: {e}", $media_type);
-                    crate::utils::errors::reply_error(ctx, &e).await?;
-                }
-            }
-
-            Ok(())
-        }
-    };
+async fn autocomplete_anime(
+    ctx: crate::models::bot_data::Context<'_>,
+    partial: &str,
+) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
+    autocomplete_media(ctx, partial, "ANIME").await
 }
 
-make_search_command!(
-    anime,
-    crate::api::anilist::fetch_anime,
-    "Anime",
-    "Search AniList for an anime by title."
-);
-make_search_command!(
-    manga,
-    crate::api::anilist::fetch_manga,
-    "Manga",
-    "Search AniList for a manga by title."
-);
+async fn autocomplete_manga(
+    ctx: crate::models::bot_data::Context<'_>,
+    partial: &str,
+) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
+    autocomplete_media(ctx, partial, "MANGA").await
+}
+
+async fn autocomplete_media(
+    ctx: crate::models::bot_data::Context<'_>,
+    partial: &str,
+    media_type: &str,
+) -> std::vec::IntoIter<poise::serenity_prelude::AutocompleteChoice> {
+    if partial.len() < 2 {
+        return Vec::new().into_iter();
+    }
+    let data = ctx.data();
+    match crate::api::anilist::fetch_media_autocomplete(
+        &data.http_client,
+        &data.rate_limiter,
+        partial,
+        media_type,
+    )
+    .await
+    {
+        Ok(items) => items
+            .into_iter()
+            .map(|m| {
+                let label = match m.format.as_deref() {
+                    Some(fmt) => format!("{} ({})", m.title.preferred(), fmt),
+                    None => m.title.preferred().to_string(),
+                };
+                poise::serenity_prelude::AutocompleteChoice::new(
+                    label,
+                    m.title.preferred().to_string(),
+                )
+            })
+            .collect::<Vec<_>>()
+            .into_iter(),
+        Err(_) => Vec::new().into_iter(),
+    }
+}
+
+// ─── Search commands ─────────────────────────────────────────────────────────
+
+/// Search AniList for an anime by title.
+#[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Search")]
+pub async fn anime(
+    ctx: crate::models::bot_data::Context<'_>,
+    #[description = "Title to search for"]
+    #[autocomplete = "autocomplete_anime"]
+    title: String,
+) -> Result<(), crate::models::bot_data::Error> {
+    ctx.defer().await?;
+    let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
+
+    match crate::api::anilist::fetch_anime(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
+        Ok(results) if results.is_empty() => {
+            ctx.say(format!("No Anime found for `{title}`."))
+                .await?;
+        }
+        Ok(results) => {
+            let pages: Vec<_> = results
+                .iter()
+                .map(|m| {
+                    crate::utils::embeds::media_embed(
+                        m,
+                        "Anime",
+                        prefs.title_language.clone(),
+                        accent_color,
+                    )
+                })
+                .collect();
+            crate::utils::pagination::paginate(ctx, pages).await?;
+        }
+        Err(e) => {
+            tracing::warn!("Anime fetch failed for {title:?}: {e}");
+            crate::utils::errors::reply_error(ctx, &e).await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Search AniList for a manga by title.
+#[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Search")]
+pub async fn manga(
+    ctx: crate::models::bot_data::Context<'_>,
+    #[description = "Title to search for"]
+    #[autocomplete = "autocomplete_manga"]
+    title: String,
+) -> Result<(), crate::models::bot_data::Error> {
+    ctx.defer().await?;
+    let data = ctx.data();
+    let prefs = data.store.get_user_prefs(ctx.author().id.get()).await;
+    let guild_id = ctx.guild_id().map(|id| id.get());
+    let accent_color = if let Some(gid) = guild_id {
+        data.store.get_settings(gid).await.accent_color
+    } else {
+        None
+    };
+
+    match crate::api::anilist::fetch_manga(&data.http_client, &data.cache, &data.rate_limiter, &title).await {
+        Ok(results) if results.is_empty() => {
+            ctx.say(format!("No Manga found for `{title}`."))
+                .await?;
+        }
+        Ok(results) => {
+            let pages: Vec<_> = results
+                .iter()
+                .map(|m| {
+                    crate::utils::embeds::media_embed(
+                        m,
+                        "Manga",
+                        prefs.title_language.clone(),
+                        accent_color,
+                    )
+                })
+                .collect();
+            crate::utils::pagination::paginate(ctx, pages).await?;
+        }
+        Err(e) => {
+            tracing::warn!("Manga fetch failed for {title:?}: {e}");
+            crate::utils::errors::reply_error(ctx, &e).await?;
+        }
+    }
+
+    Ok(())
+}
 
 pub fn all() -> Vec<poise::Command<Data, Error>> {
     vec![

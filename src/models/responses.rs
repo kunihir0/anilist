@@ -562,6 +562,66 @@ pub struct StaffBirthday {
     pub site_url: String,
 }
 
+// ─── Autocomplete response types ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteMediaItem {
+    pub id: u64,
+    pub title: MediaTitle,
+    pub format: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteMediaPage {
+    pub media: Vec<AutocompleteMediaItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteMediaData {
+    #[serde(rename = "Page")]
+    pub page: AutocompleteMediaPage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteNameItem {
+    pub id: u64,
+    pub name: AutocompleteName,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteName {
+    pub full: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteNamePage {
+    pub characters: Option<Vec<AutocompleteNameItem>>,
+    pub staff: Option<Vec<AutocompleteNameItem>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteNameData {
+    #[serde(rename = "Page")]
+    pub page: AutocompleteNamePage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteStudioItem {
+    pub id: u64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteStudioPage {
+    pub studios: Vec<AutocompleteStudioItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutocompleteStudioData {
+    #[serde(rename = "Page")]
+    pub page: AutocompleteStudioPage,
+}
+
 // ─── AniList error envelope ───────────────────────────────────────────────────
 //
 // AniList returns errors as `{ "data": null, "errors": [{ "message", "status" }] }`

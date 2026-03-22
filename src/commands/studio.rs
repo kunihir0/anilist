@@ -5,11 +5,40 @@ use crate::{
 };
 use poise::CreateReply;
 
+async fn autocomplete_studio(
+    ctx: Context<'_>,
+    partial: &str,
+) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
+    if partial.len() < 2 {
+        return Vec::new().into_iter();
+    }
+    let data = ctx.data();
+    match crate::api::anilist::fetch_studio_autocomplete(
+        &data.http_client,
+        &data.rate_limiter,
+        partial,
+    )
+    .await
+    {
+        Ok(items) => items
+            .into_iter()
+            .map(|s| poise::serenity_prelude::AutocompleteChoice::new(
+                s.name.clone(),
+                s.name,
+            ))
+            .collect::<Vec<_>>()
+            .into_iter(),
+        Err(_) => Vec::new().into_iter(),
+    }
+}
+
 /// Search AniList for a studio by name.
 #[poise::command(slash_command, prefix_command, user_cooldown = 5, category = "Search")]
 pub async fn studio(
     ctx: Context<'_>,
-    #[description = "Studio name to search for"] name: String,
+    #[description = "Studio name to search for"]
+    #[autocomplete = "autocomplete_studio"]
+    name: String,
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();

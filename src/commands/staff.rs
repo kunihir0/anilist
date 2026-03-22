@@ -1,12 +1,39 @@
 use crate::{
     api::anilist::{fetch_staff, fetch_staff_birthdays},
     models::bot_data::{Context, Error},
-    utils::{
-        embeds::{staff_birthday_embed, staff_embed},
-        errors::reply_error,
-    },
+    utils::{embeds::{staff_birthday_embed, staff_embed}, errors::reply_error},
 };
 use poise::CreateReply;
+
+async fn autocomplete_staff(
+    ctx: Context<'_>,
+    partial: &str,
+) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
+    if partial.len() < 2 {
+        return Vec::new().into_iter();
+    }
+    let data = ctx.data();
+    match crate::api::anilist::fetch_staff_autocomplete(
+        &data.http_client,
+        &data.rate_limiter,
+        partial,
+    )
+    .await
+    {
+        Ok(items) => items
+            .into_iter()
+            .map(|s| {
+                let name = s.name.full.unwrap_or_else(|| "Unknown".to_string());
+                poise::serenity_prelude::AutocompleteChoice::new(
+                    name.clone(),
+                    name,
+                )
+            })
+            .collect::<Vec<_>>()
+            .into_iter(),
+        Err(_) => Vec::new().into_iter(),
+    }
+}
 
 /// Search AniList for a staff member (VA, director, etc) by name.
 #[poise::command(
@@ -23,7 +50,9 @@ pub async fn staff(_ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(slash_command, prefix_command)]
 pub async fn search(
     ctx: Context<'_>,
-    #[description = "Staff name to search for"] name: String,
+    #[description = "Staff name to search for"]
+    #[autocomplete = "autocomplete_staff"]
+    name: String,
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();

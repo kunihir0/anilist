@@ -1,8 +1,44 @@
-use crate::api::anilist::fetch_media_by_title;
-use crate::models::bot_data::{Context, Error};
 use crate::store::ServerListEntry;
-use crate::utils::embeds::server_list_embed;
+use crate::{
+    api::anilist::fetch_media_by_title,
+    models::bot_data::{Context, Error},
+    utils::embeds::server_list_embed,
+};
 use poise::serenity_prelude as serenity;
+
+async fn autocomplete_media(
+    ctx: Context<'_>,
+    partial: &str,
+) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
+    if partial.len() < 2 {
+        return Vec::new().into_iter();
+    }
+    let data = ctx.data();
+    match crate::api::anilist::fetch_media_autocomplete(
+        &data.http_client,
+        &data.rate_limiter,
+        partial,
+        "ANIME",
+    )
+    .await
+    {
+        Ok(items) => items
+            .into_iter()
+            .map(|m| {
+                let label = match m.format.as_deref() {
+                    Some(fmt) => format!("{} ({})", m.title.preferred(), fmt),
+                    None => m.title.preferred().to_string(),
+                };
+                poise::serenity_prelude::AutocompleteChoice::new(
+                    label,
+                    m.title.preferred().to_string(),
+                )
+            })
+            .collect::<Vec<_>>()
+            .into_iter(),
+        Err(_) => Vec::new().into_iter(),
+    }
+}
 
 /// Manage the shared server anime list.
 #[poise::command(
@@ -20,7 +56,9 @@ pub async fn serverlist(_ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(slash_command, prefix_command, guild_only)]
 pub async fn add(
     ctx: Context<'_>,
-    #[description = "Title to add"] title: String,
+    #[description = "Title to add"]
+    #[autocomplete = "autocomplete_media"]
+    title: String,
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let data = ctx.data();

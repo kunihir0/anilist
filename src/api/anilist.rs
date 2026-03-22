@@ -515,3 +515,71 @@ pub async fn fetch_filtered_media(
         graphql_post(client, rate_limiter, queries::FILTER_QUERY, vars).await?;
     Ok(data.page.media)
 }
+
+// ─── Autocomplete helpers ─────────────────────────────────────────────────────
+
+use crate::models::responses::{
+    AutocompleteMediaData, AutocompleteMediaItem, AutocompleteNameData, AutocompleteNameItem,
+    AutocompleteStudioData, AutocompleteStudioItem,
+};
+
+pub async fn fetch_media_autocomplete(
+    client: &Client,
+    rate_limiter: &RateLimiter,
+    search: &str,
+    media_type: &str,
+) -> Result<Vec<AutocompleteMediaItem>, Error> {
+    let data: AutocompleteMediaData = graphql_post(
+        client,
+        rate_limiter,
+        queries::MEDIA_AUTOCOMPLETE_QUERY,
+        json!({ "search": search, "type": media_type }),
+    )
+    .await?;
+    Ok(data.page.media)
+}
+
+pub async fn fetch_character_autocomplete(
+    client: &Client,
+    rate_limiter: &RateLimiter,
+    search: &str,
+) -> Result<Vec<AutocompleteNameItem>, Error> {
+    let data: AutocompleteNameData = graphql_post(
+        client,
+        rate_limiter,
+        queries::CHARACTER_AUTOCOMPLETE_QUERY,
+        json!({ "search": search }),
+    )
+    .await?;
+    Ok(data.page.characters.unwrap_or_default())
+}
+
+pub async fn fetch_staff_autocomplete(
+    client: &Client,
+    rate_limiter: &RateLimiter,
+    search: &str,
+) -> Result<Vec<AutocompleteNameItem>, Error> {
+    let data: AutocompleteNameData = graphql_post(
+        client,
+        rate_limiter,
+        queries::STAFF_AUTOCOMPLETE_QUERY,
+        json!({ "search": search }),
+    )
+    .await?;
+    Ok(data.page.staff.unwrap_or_default())
+}
+
+pub async fn fetch_studio_autocomplete(
+    client: &Client,
+    rate_limiter: &RateLimiter,
+    search: &str,
+) -> Result<Vec<AutocompleteStudioItem>, Error> {
+    let data: AutocompleteStudioData = graphql_post(
+        client,
+        rate_limiter,
+        queries::STUDIO_AUTOCOMPLETE_QUERY,
+        json!({ "search": search }),
+    )
+    .await?;
+    Ok(data.page.studios)
+}
