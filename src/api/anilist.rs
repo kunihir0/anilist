@@ -239,6 +239,44 @@ pub async fn fetch_studio(
     .await
 }
 
+pub async fn fetch_media_characters_by_id(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    media_id: u64,
+) -> Result<crate::models::responses::Media, Error> {
+    fetch_cached(
+        client,
+        cache,
+        rate_limiter,
+        format!("media:characters:{}", media_id),
+        queries::MEDIA_CHARACTERS_BY_ID_QUERY,
+        json!({ "id": media_id }),
+        |d: crate::models::responses::MediaData| d.media,
+        None,
+    )
+    .await
+}
+
+pub async fn fetch_media_recommendations_by_id(
+    client: &Client,
+    cache: &Cache,
+    rate_limiter: &RateLimiter,
+    media_id: u64,
+) -> Result<crate::models::responses::Media, Error> {
+    fetch_cached(
+        client,
+        cache,
+        rate_limiter,
+        format!("media:recommendations:{}", media_id),
+        queries::MEDIA_RECOMMENDATIONS_BY_ID_QUERY,
+        json!({ "id": media_id }),
+        |d: crate::models::responses::MediaData| d.media,
+        None,
+    )
+    .await
+}
+
 pub async fn fetch_upcoming(
     client: &Client,
     cache: &Cache,

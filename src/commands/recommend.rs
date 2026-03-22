@@ -107,6 +107,8 @@ pub async fn compare(
             start_date: None,
             next_airing_episode: None,
             relations: None,
+            characters: None,
+            recommendations: None,
         })
         .collect();
 

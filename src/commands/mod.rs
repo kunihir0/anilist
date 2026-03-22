@@ -104,17 +104,18 @@ pub async fn anime(
         }
         Ok(results) => {
             let pages: Vec<_> = results
-                .iter()
+                .into_iter()
                 .map(|m| {
-                    crate::utils::embeds::media_embed(
-                        m,
+                    let embed = crate::utils::embeds::media_embed(
+                        &m,
                         "Anime",
                         prefs.title_language.clone(),
                         accent_color,
-                    )
+                    );
+                    (embed, m)
                 })
                 .collect();
-            crate::utils::pagination::paginate(ctx, pages).await?;
+            crate::utils::pagination::paginate_media(ctx, pages).await?;
         }
         Err(e) => {
             tracing::warn!("Anime fetch failed for {title:?}: {e}");
@@ -150,17 +151,18 @@ pub async fn manga(
         }
         Ok(results) => {
             let pages: Vec<_> = results
-                .iter()
+                .into_iter()
                 .map(|m| {
-                    crate::utils::embeds::media_embed(
-                        m,
+                    let embed = crate::utils::embeds::media_embed(
+                        &m,
                         "Manga",
                         prefs.title_language.clone(),
                         accent_color,
-                    )
+                    );
+                    (embed, m)
                 })
                 .collect();
-            crate::utils::pagination::paginate(ctx, pages).await?;
+            crate::utils::pagination::paginate_media(ctx, pages).await?;
         }
         Err(e) => {
             tracing::warn!("Manga fetch failed for {title:?}: {e}");

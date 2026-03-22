@@ -110,6 +110,51 @@ pub struct Media {
     // Relations (None for queries that don't fetch them)
     #[serde(default)]
     pub relations: Option<MediaRelations>,
+
+    // Characters (None for queries that don't fetch them)
+    #[serde(default)]
+    pub characters: Option<MediaCharacterConnection>,
+
+    // Recommendations (None for queries that don't fetch them)
+    #[serde(default)]
+    pub recommendations: Option<MediaRecommendationConnection>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaCharacterConnection {
+    pub edges: Vec<MediaCharacterEdge>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaCharacterEdge {
+    pub role: Option<String>,
+    pub node: MediaCharacterNode,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaCharacterNode {
+    pub id: u64,
+    pub name: CharacterName,
+    #[serde(rename = "siteUrl")]
+    pub site_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaRecommendationConnection {
+    pub nodes: Vec<MediaRecommendationNode>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaRecommendationNode {
+    #[serde(rename = "mediaRecommendation")]
+    pub media_recommendation: Option<MediaRecommendation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaRecommendation {
+    pub title: MediaTitle,
+    #[serde(rename = "siteUrl")]
+    pub site_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -156,6 +201,14 @@ impl NextAiringEpisode {
             (d, h) => format!("{d}d {h}h"),
         }
     }
+}
+
+// ─── Direct Media response ───────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaData {
+    #[serde(rename = "Media")]
+    pub media: Media,
 }
 
 // ─── Paginated media response ─────────────────────────────────────────────────
